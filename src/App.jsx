@@ -132,50 +132,6 @@ const callGemini = async (prompt, systemInstruction = "You are a professional bu
   return attempt();
 };
 
-// --- Initial Mock Data ---
-const participantsDataList = [
-  { nb: 'NB19258', name: 'Alexandre Feio' },
-  { nb: 'NB10706', name: 'Alfredo Lopes' },
-  { nb: 'NB10226', name: 'Álvaro José Ferreira' },
-  { nb: 'NB11358', name: 'Ana Barradas' },
-  { nb: 'NB27787', name: 'André Antunes Vieira' },
-  { nb: 'NB15302', name: 'André Fonseca' },
-  { nb: 'NB10471', name: 'António Lourenço' },
-  { nb: 'NB17884', name: 'António Rodrigues' },
-  { nb: '', name: 'Amélia Goulão' },
-  { nb: 'NB22689', name: 'Aparício Vieira' },
-  { nb: 'NB30949', name: 'Binh Doah' },
-  { nb: 'NB25180', name: 'Bjorn Rohs' },
-  { nb: 'NB11813', name: 'Bruno Manso Preto' },
-  { nb: 'NB23703', name: 'Bruno Monteiro' }
-];
-
-const initialAggregatedData = [
-  { id: 1, year: '2025', month: 'January', attendance: 98, inPerson: 69, remote: 33, nps: 75, insightful: 4.3, logistics: 3.4, host: 'Álvaro Ferreira', theme: 'Kick Off', agenda: [], gallery: [] },
-  { id: 11, year: '2026', month: 'March', attendance: 74, inPerson: 46, remote: 42, nps: 80, insightful: 4.45, logistics: 3.44, host: 'Sofia Esteves', theme: 'Journey into next gen intelligence', agenda: [{ topic: 'Welcome & Context', speaker: 'Sofia Esteves' }], gallery: ['https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&q=80&w=300&h=200'] }
-];
-
-const initialParticipantData = (() => {
-  const data = [];
-  initialAggregatedData.filter(d => d.attendance !== null).forEach(event => {
-    participantsDataList.forEach(person => {
-      const rand = Math.random();
-      let attendanceType = '';
-      if (rand > 0.6) attendanceType = 'In-person';
-      else if (rand > 0.3) attendanceType = 'Remote';
-      data.push({
-        id: Math.floor(Math.random() * 1000000),
-        year: normalize(event.year),
-        month: normalize(event.month),
-        nb: person.nb,
-        participantName: person.name,
-        attendanceType: attendanceType
-      });
-    });
-  });
-  return data;
-})();
-
 // --- Custom AI Formatting Component ---
 const CleanAISummary = ({ text }) => {
   if (!text) return null;
@@ -218,7 +174,7 @@ const CleanAISummary = ({ text }) => {
   );
 };
 
-// --- Sub-page Components (Defined ABOVE App) ---
+// --- Sub-page Components ---
 
 function InsightsPage({ completedEvents, brand, callGemini }) {
   const [aiRecs, setAiRecs] = useState('');
@@ -614,13 +570,13 @@ function EventManagementPage({ aggData, setAggData, brand, callGemini }) {
 
   return (
     <div className="space-y-6 text-sm font-bold animate-in fade-in duration-300">
-      <div className="flex justify-between items-end mb-8 text-black"><div><h1 className="text-2xl font-black">Event Strategy</h1><p className="text-[#636466] font-medium">Design event themes and content flows.</p></div><div className="w-80"><label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Select Event</label><select className="w-full border border-[#C7C8CA] rounded p-2.5 text-xs font-black outline-none bg-white text-[#ED1C24]" value={selectedEventId || ''} onChange={e => setSelectedEventId(e.target.value)}>{aggData.map(e => <option key={e.id} value={e.id}>{e.month} {e.year} - {e.theme || 'Untitled'}</option>)}</select></div></div>
+      <div className="flex justify-between items-end mb-8 text-black"><div><h1 className="text-2xl font-black">Strategic Content</h1><p className="text-[#636466] font-medium">Design event themes and content flows.</p></div><div className="w-80"><label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Select Event</label><select className="w-full border border-[#C7C8CA] rounded p-2.5 text-xs font-black outline-none bg-white text-[#ED1C24]" value={selectedEventId || ''} onChange={e => setSelectedEventId(e.target.value)}>{aggData.map(e => <option key={e.id} value={e.id}>{e.month} {e.year} - {e.theme || 'Untitled'}</option>)}</select></div></div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-black">
-        <div className="space-y-6"><Card className="p-6"><h3 className="text-lg font-black mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-[#ED1C24]" /> Core Info</h3><div className="space-y-4"><div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Theme</label><input type="text" value={selectedEvent?.theme || ''} onChange={e => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, theme: e.target.value} : x))} className="w-full border rounded p-2.5 text-xs font-medium outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all"/></div><div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Host</label><input type="text" value={selectedEvent?.host || ''} onChange={e => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, host: e.target.value} : x))} className="w-full border rounded p-2.5 text-xs font-medium outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all"/></div></div></Card></div>
+        <div className="space-y-6"><Card className="p-6"><h3 className="text-lg font-black mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-[#ED1C24]" /> Identity</h3><div className="space-y-4"><div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Strategic Theme</label><input type="text" value={selectedEvent?.theme || ''} onChange={e => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, theme: e.target.value} : x))} className="w-full border rounded p-2.5 text-xs font-medium outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all"/></div><div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Master Host</label><input type="text" value={selectedEvent?.host || ''} onChange={e => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, host: e.target.value} : x))} className="w-full border rounded p-2.5 text-xs font-medium outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all"/></div></div></Card></div>
         <div className="lg:col-span-2 space-y-6">
-          <Card className="p-6">
-            <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Sparkles className="w-5 h-5 text-[#ED1C24]" /> AI Suggestions</h3>
-            <div className="flex gap-2 mb-6"><textarea className="flex-1 border rounded p-2.5 text-xs font-medium outline-none h-11 resize-none focus:ring-1 focus:ring-[#ED1C24]" placeholder="Focus area for suggestions..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}/><button onClick={handleGen} disabled={isGenerating || !aiPrompt} className="bg-black text-white px-5 rounded text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all">{isGenerating ? "..." : "Suggest"}</button></div>
+          <Card className="p-6 text-black">
+            <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Sparkles className="w-5 h-5 text-[#ED1C24]" /> AI Content Studio</h3>
+            <div className="flex gap-2 mb-6"><textarea className="flex-1 border rounded p-2.5 text-xs font-medium outline-none h-11 resize-none focus:ring-1 focus:ring-[#ED1C24]" placeholder="Focus area for AI agenda suggestions..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}/><button onClick={handleGen} disabled={isGenerating || !aiPrompt} className="bg-black text-white px-5 rounded text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all">{isGenerating ? "..." : "Generate"}</button></div>
             <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-black"><List className="w-5 h-5 text-[#ED1C24]" /> Live Agenda</h3>
             <div className="space-y-3 mb-6">{(selectedEvent?.agenda || []).map((item, idx) => (
               <div key={idx} className="flex items-center justify-between p-3 border rounded bg-[#F8F8F8] group hover:bg-white transition-all shadow-sm">
@@ -654,13 +610,13 @@ function EventManagementPage({ aggData, setAggData, brand, callGemini }) {
   );
 }
 
-// --- Primary Component ---
+// --- Main Application Component ---
 export default function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
-  const [aggData, setAggData] = useState(initialAggregatedData);
-  const [partData, setPartData] = useState(initialParticipantData); 
+  const [aggData, setAggData] = useState([]);
+  const [partData, setPartData] = useState([]); 
 
   const [expandedImage, setExpandedImage] = useState(null);
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
@@ -670,6 +626,7 @@ export default function App() {
   const [webhookUrl, setWebhookUrl] = useState("https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec");
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true);
 
   const fetchAllData = async () => {
     setIsConnecting(true); setConnectionError(null);
@@ -700,7 +657,7 @@ export default function App() {
         participantName: p.name, attendanceType: p.presence === 'X' ? 'In-person' : (p.presence === 'R' ? 'Remote' : '') 
       }));
       setAggData(events); setPartData(participants);
-    } catch (err) { setConnectionError(err.message); } finally { setIsConnecting(false); }
+    } catch (err) { setConnectionError(err.message); } finally { setIsConnecting(false); setIsLoadingInitial(false); }
   };
 
   useEffect(() => {
@@ -835,98 +792,114 @@ Data for current event ("${currentHomeEvent.theme}"):
       </div>
 
       <div className="flex-1 overflow-auto p-8 max-w-7xl mx-auto">
-        {activeTab === 'main' && currentHomeEvent && (
-          <div className="space-y-6">
-            <div className="flex justify-between items-start gap-4 text-black">
-              <div>
-                <div className="flex items-center gap-3 mb-1">
-                  <h1 className="text-2xl font-black">Event Analysis</h1>
-                  <select 
-                    value={selectedHomeEventId === '' ? latestEventId : selectedHomeEventId} 
-                    onChange={e => setSelectedHomeEventId(e.target.value)} 
-                    className="border border-[#C7C8CA] rounded px-3 py-1 text-sm font-bold bg-white text-[#ED1C24] outline-none"
-                  >
-                    {completedEvents.map(e => <option key={e.id} value={e.id}>{e.month} {e.year}</option>)}
-                  </select>
-                </div>
-                <h2 className="text-lg font-bold text-[#636466] mb-1">{currentHomeEvent.theme}</h2>
-                <p className="text-xs text-[#9C9B9C] font-black uppercase tracking-widest flex items-center gap-2"><Users className="w-3.5 h-3.5 text-[#ED1C24]"/> Hosted by {currentHomeEvent.host}</p>
+        {isLoadingInitial && aggData.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-[#9C9B9C] space-y-4">
+            <div className="w-8 h-8 border-4 border-[#ED1C24] border-t-transparent rounded-full animate-spin"></div>
+            <p className="font-bold tracking-widest uppercase text-xs">Loading Live Data...</p>
+          </div>
+        ) : (
+          <>
+            {activeTab === 'main' && !currentHomeEvent && (
+              <div className="h-full flex flex-col items-center justify-center text-[#9C9B9C] space-y-4">
+                <Database className="w-12 h-12 text-[#EEEEEE]" />
+                <p className="font-bold tracking-widest uppercase text-xs">No Events Found. Please Sync Data.</p>
               </div>
-              <button onClick={handleGenerateSummary} disabled={isSummarizing} className="bg-black hover:bg-[#333333] text-white px-5 py-2.5 rounded shadow-sm flex items-center gap-2 text-sm font-bold disabled:opacity-50 transition-all">
-                <Sparkles className="w-4 h-4" />{isSummarizing ? "Drafting..." : "✨ AI Summary"}
-              </button>
-            </div>
+            )}
+            
+            {activeTab === 'main' && currentHomeEvent && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-start gap-4 text-black">
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h1 className="text-2xl font-black">Event Analysis</h1>
+                      <select 
+                        value={selectedHomeEventId === '' ? latestEventId : selectedHomeEventId} 
+                        onChange={e => setSelectedHomeEventId(e.target.value)} 
+                        className="border border-[#C7C8CA] rounded px-3 py-1 text-sm font-bold bg-white text-[#ED1C24] outline-none"
+                      >
+                        {completedEvents.map(e => <option key={e.id} value={e.id}>{e.month} {e.year}</option>)}
+                      </select>
+                    </div>
+                    <h2 className="text-lg font-bold text-[#636466] mb-1">{currentHomeEvent.theme}</h2>
+                    <p className="text-xs text-[#9C9B9C] font-black uppercase tracking-widest flex items-center gap-2"><Users className="w-3.5 h-3.5 text-[#ED1C24]"/> Hosted by {currentHomeEvent.host}</p>
+                  </div>
+                  <button onClick={handleGenerateSummary} disabled={isSummarizing} className="bg-black hover:bg-[#333333] text-white px-5 py-2.5 rounded shadow-sm flex items-center gap-2 text-sm font-bold disabled:opacity-50 transition-all">
+                    <Sparkles className="w-4 h-4" />{isSummarizing ? "Drafting..." : "✨ AI Summary"}
+                  </button>
+                </div>
 
-            {executiveSummary && (
-              <Card className="p-6 border-l-4 border-l-[#ED1C24] bg-white animate-in fade-in duration-500 relative">
-                <button onClick={() => setExecutiveSummary('')} className="absolute top-4 right-4 text-[#9C9B9C] hover:text-[#000000] transition-colors"><X className="w-5 h-5"/></button>
-                <h3 className="text-xs font-black text-[#9C9B9C] uppercase tracking-widest mb-1 flex items-center gap-2 text-black"><FileText className="w-4 h-4 text-black"/> AI Executive Summary</h3>
-                <CleanAISummary text={executiveSummary} />
-              </Card>
+                {executiveSummary && (
+                  <Card className="p-6 border-l-4 border-l-[#ED1C24] bg-white animate-in fade-in duration-500 relative">
+                    <button onClick={() => setExecutiveSummary('')} className="absolute top-4 right-4 text-[#9C9B9C] hover:text-[#000000] transition-colors"><X className="w-5 h-5"/></button>
+                    <h3 className="text-xs font-black text-[#9C9B9C] uppercase tracking-widest mb-1 flex items-center gap-2 text-black"><FileText className="w-4 h-4 text-black"/> AI Executive Summary</h3>
+                    <CleanAISummary text={executiveSummary} />
+                  </Card>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-black">
+                  <Card className="p-5 border-l-4 border-l-[#ED1C24]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Attendance</div><div className="text-3xl font-black mb-2">{currentHomeEvent.attendance}%</div><DeltaIndicator current={currentHomeEvent.attendance} previous={prevHomeEvent?.attendance}/></Card>
+                  <Card className="p-5 border-l-4 border-l-black"><div className="text-xs font-black text-[#9C9B9C] uppercase">NPS Score</div><div className="text-3xl font-black mb-2">{currentHomeEvent.nps}</div><DeltaIndicator current={currentHomeEvent.nps} previous={prevHomeEvent?.nps}/></Card>
+                  <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl font-black mb-2">{currentHomeEvent.insightful}</div><DeltaIndicator current={currentHomeEvent.insightful} previous={prevHomeEvent?.insightful}/></Card>
+                  <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl font-black mb-2">{currentHomeEvent.logistics}</div><DeltaIndicator current={currentHomeEvent.logistics} previous={prevHomeEvent?.logistics}/></Card>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-2 space-y-6">
+                    <Card className="p-6">
+                      <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-black"><Clock className="w-5 h-5 text-[#ED1C24]" /> Event Agenda</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {(currentHomeEvent.agenda || []).map((item, idx) => (
+                          <div key={idx} className="p-4 border border-[#EEEEEE] rounded bg-[#F8F8F8] flex items-center gap-3">
+                            <Avatar name={item.speaker} />
+                            <div><h4 className="font-bold text-sm text-black">{item.topic}</h4><p className="text-[10px] font-black text-[#636466] uppercase">{item.speaker}</p></div>
+                          </div>
+                        ))}
+                        {(!currentHomeEvent.agenda || currentHomeEvent.agenda.length === 0) && (
+                          <div className="col-span-2 text-center py-8 text-[#9C9B9C] font-bold uppercase tracking-widest border-2 border-dashed border-[#EEEEEE] rounded">No agenda items added</div>
+                        )}
+                      </div>
+                    </Card>
+                    <Card className="flex flex-col">
+                      <div className="p-5 border-b border-[#EEEEEE] flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-black">
+                        <div>
+                          <h3 className="text-lg font-black">Attendee Roster</h3>
+                          <p className="text-[10px] font-black text-[#9C9B9C] uppercase tracking-wider">{totalAttendees} Present / {eventParticipants.length} Invited</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9C9B9C]" /><input type="text" placeholder="Search..." className="pl-9 pr-4 py-2 border border-[#C7C8CA] rounded text-xs outline-none focus:border-[#ED1C24] transition-all" value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} /></div>
+                          <div className="flex bg-[#F8F8F8] p-1 rounded border shrink-0">
+                            {['All', 'In-person', 'Remote', 'Absent'].map(tab => <button key={tab} onClick={() => setRosterFilter(tab)} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded transition-all ${rosterFilter === tab ? 'bg-white text-[#ED1C24] shadow-sm' : 'text-[#636466]'}`}>{tab}</button>)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="max-h-[400px] overflow-y-auto">
+                        <table className="w-full text-left text-xs font-bold"><thead className="bg-[#F8F8F8] sticky top-0 border-b"><tr><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Participant</th><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Status</th></tr></thead><tbody className="divide-y">
+                          {filteredParticipants.map((p, i) => (<tr key={p.id || i} className="hover:bg-[#F8F8F8] transition-colors text-black"><td className="py-3 px-5">{p.participantName}</td><td className="py-3 px-5"><span className={`inline-flex px-2 py-1 rounded-sm text-[10px] font-black uppercase ${p.attendanceType === 'In-person' ? 'bg-[#EEEEEE] text-black' : p.attendanceType === 'Remote' ? 'bg-[#FF4F50]/10 text-[#ED1C24]' : 'bg-gray-100 text-[#9C9B9C] opacity-60'}`}>{p.attendanceType || 'Absent'}</span></td></tr>))}
+                        </tbody></table>
+                      </div>
+                    </Card>
+                  </div>
+                  <div className="space-y-6">
+                    <Card className="p-6">
+                      <h3 className="text-lg font-black mb-4 text-black">Participant Split</h3>
+                      <div className="h-64 relative">
+                        <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[{ name: 'In-person', value: currentHomeEvent.inPerson || 0 }, { name: 'Remote', value: currentHomeEvent.remote || 0 }, { name: 'Absent', value: absencesCount || 0 }]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value"><Cell fill={BRAND.colors.secondary} /><Cell fill={BRAND.colors.primary} /><Cell fill="#C7C8CA" /></Pie><RechartsTooltip/></PieChart></ResponsiveContainer>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4 text-black"><span className="text-3xl font-black">{eventParticipants.length}</span><span className="text-[10px] font-bold text-[#9C9B9C] uppercase">Invited</span></div>
+                      </div>
+                    </Card>
+                  </div>
+                </div>
+              </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-black">
-              <Card className="p-5 border-l-4 border-l-[#ED1C24]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Attendance</div><div className="text-3xl font-black mb-2">{currentHomeEvent.attendance}%</div><DeltaIndicator current={currentHomeEvent.attendance} previous={prevHomeEvent?.attendance}/></Card>
-              <Card className="p-5 border-l-4 border-l-black"><div className="text-xs font-black text-[#9C9B9C] uppercase">NPS Score</div><div className="text-3xl font-black mb-2">{currentHomeEvent.nps}</div><DeltaIndicator current={currentHomeEvent.nps} previous={prevHomeEvent?.nps}/></Card>
-              <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl font-black mb-2">{currentHomeEvent.insightful}</div><DeltaIndicator current={currentHomeEvent.insightful} previous={prevHomeEvent?.insightful}/></Card>
-              <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl font-black mb-2">{currentHomeEvent.logistics}</div><DeltaIndicator current={currentHomeEvent.logistics} previous={prevHomeEvent?.logistics}/></Card>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <Card className="p-6">
-                  <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-black"><Clock className="w-5 h-5 text-[#ED1C24]" /> Event Agenda</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {(currentHomeEvent.agenda || []).map((item, idx) => (
-                      <div key={idx} className="p-4 border border-[#EEEEEE] rounded bg-[#F8F8F8] flex items-center gap-3">
-                        <Avatar name={item.speaker} />
-                        <div><h4 className="font-bold text-sm text-black">{item.topic}</h4><p className="text-[10px] font-black text-[#636466] uppercase">{item.speaker}</p></div>
-                      </div>
-                    ))}
-                    {(!currentHomeEvent.agenda || currentHomeEvent.agenda.length === 0) && (
-                      <div className="col-span-2 text-center py-8 text-[#9C9B9C] font-bold uppercase tracking-widest border-2 border-dashed border-[#EEEEEE] rounded">No agenda items added</div>
-                    )}
-                  </div>
-                </Card>
-                <Card className="flex flex-col">
-                  <div className="p-5 border-b border-[#EEEEEE] flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-black">
-                    <div>
-                      <h3 className="text-lg font-black">Attendee Roster</h3>
-                      <p className="text-[10px] font-black text-[#9C9B9C] uppercase tracking-wider">{totalAttendees} Present / {eventParticipants.length} Invited</p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9C9B9C]" /><input type="text" placeholder="Search..." className="pl-9 pr-4 py-2 border border-[#C7C8CA] rounded text-xs outline-none focus:border-[#ED1C24] transition-all" value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} /></div>
-                      <div className="flex bg-[#F8F8F8] p-1 rounded border shrink-0">
-                        {['All', 'In-person', 'Remote', 'Absent'].map(tab => <button key={tab} onClick={() => setRosterFilter(tab)} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded transition-all ${rosterFilter === tab ? 'bg-white text-[#ED1C24] shadow-sm' : 'text-[#636466]'}`}>{tab}</button>)}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="max-h-[400px] overflow-y-auto">
-                    <table className="w-full text-left text-xs font-bold"><thead className="bg-[#F8F8F8] sticky top-0 border-b"><tr><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Participant</th><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Status</th></tr></thead><tbody className="divide-y">
-                      {filteredParticipants.map((p, i) => (<tr key={p.id || i} className="hover:bg-[#F8F8F8] transition-colors text-black"><td className="py-3 px-5">{p.participantName}</td><td className="py-3 px-5"><span className={`inline-flex px-2 py-1 rounded-sm text-[10px] font-black uppercase ${p.attendanceType === 'In-person' ? 'bg-[#EEEEEE] text-black' : p.attendanceType === 'Remote' ? 'bg-[#FF4F50]/10 text-[#ED1C24]' : 'bg-gray-100 text-[#9C9B9C] opacity-60'}`}>{p.attendanceType || 'Absent'}</span></td></tr>))}
-                    </tbody></table>
-                  </div>
-                </Card>
-              </div>
-              <div className="space-y-6">
-                <Card className="p-6">
-                  <h3 className="text-lg font-black mb-4 text-black">Participant Split</h3>
-                  <div className="h-64 relative">
-                    <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[{ name: 'In-person', value: currentHomeEvent.inPerson || 0 }, { name: 'Remote', value: currentHomeEvent.remote || 0 }, { name: 'Absent', value: absencesCount || 0 }]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value"><Cell fill={BRAND.colors.secondary} /><Cell fill={BRAND.colors.primary} /><Cell fill="#C7C8CA" /></Pie><RechartsTooltip/></PieChart></ResponsiveContainer>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4 text-black"><span className="text-3xl font-black">{eventParticipants.length}</span><span className="text-[10px] font-bold text-[#9C9B9C] uppercase">Invited</span></div>
-                  </div>
-                </Card>
-              </div>
-            </div>
-          </div>
+            {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} callGemini={callGemini} />}
+            {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} brand={BRAND} callGemini={callGemini} />}
+            {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} brand={BRAND} callGemini={callGemini} />}
+            {activeTab === 'data' && <DataManagementPage aggData={aggData} setAggData={setAggData} partData={partData} setPartData={setPartData} brand={BRAND} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
+          </>
         )}
-
-        {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} callGemini={callGemini} />}
-        {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} brand={BRAND} callGemini={callGemini} />}
-        {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} brand={BRAND} callGemini={callGemini} />}
-        {activeTab === 'data' && <DataManagementPage aggData={aggData} setAggData={setAggData} partData={partData} setPartData={setPartData} brand={BRAND} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
       </div>
-      
+
       {expandedImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm transition-all p-4" onClick={() => setExpandedImage(null)}>
           <button className="absolute top-6 right-6 text-white bg-white/20 p-2 rounded-full hover:bg-white/40"><X className="w-6 h-6"/></button>
