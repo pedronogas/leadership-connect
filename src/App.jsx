@@ -4,7 +4,7 @@ import {
   ComposedChart, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  LayoutDashboard, TrendingUp, Users, Database, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Monitor, Save, CheckCircle, Clock, ExternalLink, Image as ImageIcon, Plus, X, List, Trash2, Pencil, Search, Star, TrendingDown, Lightbulb, Settings, Send, FileText, Upload, Sparkles, BrainCircuit
+  LayoutDashboard, TrendingUp, Users, Database, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Monitor, Save, CheckCircle, Clock, ExternalLink, Image as ImageIcon, Plus, X, List, Trash2, Pencil, Search, Star, TrendingDown, Lightbulb, Settings, Send, FileText, Upload, Sparkles, BrainCircuit, Download, MousePointer2
 } from 'lucide-react';
 
 // --- Celfocus Branding Guidelines V2.0 ---
@@ -507,7 +507,7 @@ function DataManagementPage({ aggData, setAggData, partData, setPartData, brand,
   const handleSync = async () => {
     setIsSaving(true);
     try {
-      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme }));
+      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery) : "[]" }));
       const agendasToSync = localData.map(e => ({ year: e.year, month: e.month, slots: [e.agenda?.[0] || {topic:"",speaker:"",artifact:""}, e.agenda?.[1] || {topic:"",speaker:"",artifact:""}, e.agenda?.[2] || {topic:"",speaker:"",artifact:""}] }));
       await fetch(webhookUrl, { method: 'POST', body: JSON.stringify({ events: eventsToSync, participants: localPartData, agendas: agendasToSync }) });
       setAggData(localData); setPartData(localPartData);
@@ -622,6 +622,7 @@ export default function App() {
   const [isAddingPhoto, setIsAddingPhoto] = useState(false);
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState(null);
 
   const [webhookUrl, setWebhookUrl] = useState("https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec");
   const [isConnecting, setIsConnecting] = useState(false);
@@ -642,6 +643,13 @@ export default function App() {
           att = Math.round(att * 100);
         }
 
+        let parsedGallery = [];
+        try {
+           parsedGallery = JSON.parse(r.gallery || "[]");
+        } catch(e) {
+           parsedGallery = r.gallery ? [r.gallery] : [];
+        }
+
         return { 
           id: i + 100, year: normalize(r.year), month: normalize(r.month), 
           attendance: att, 
@@ -649,7 +657,8 @@ export default function App() {
           remote: safeParseInt(r.remote), nps: safeParseInt(r.nps), 
           insightful: safeParseFloat(r.insightful), logistics: safeParseFloat(r.logistics), 
           host: normalize(r.host), theme: normalize(r.theme),
-          agenda: agendaMatch ? agendaMatch.slots.filter(s => s.topic || s.speaker) : []
+          agenda: agendaMatch ? agendaMatch.slots.filter(s => s.topic || s.speaker) : [],
+          gallery: parsedGallery
         };
       });
       const participants = result.participants.map((p, i) => ({ 
@@ -662,7 +671,6 @@ export default function App() {
 
   useEffect(() => {
     fetchAllData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const completedEvents = useMemo(() => {
@@ -746,12 +754,60 @@ Data for current event ("${currentHomeEvent.theme}"):
     } catch (e) { setExecutiveSummary("Error generating summary."); } finally { setIsSummarizing(false); }
   };
 
+  const handleFileUpload = async (file) => {
+    if (!file) return;
+    setUploadStatus("Uploading...");
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const base64 = e.target.result.split(',')[1];
+      try {
+        const response = await fetch(webhookUrl, {
+          method: 'POST',
+          body: JSON.stringify({
+            action: 'uploadImage',
+            year: currentHomeEvent.year,
+            month: currentHomeEvent.month,
+            fileName: file.name,
+            mimeType: file.type,
+            fileData: base64
+          })
+        });
+        const result = await response.json();
+        if (result.status === 'success') {
+          setUploadStatus("Success!");
+          // Update local state immediately
+          const newUrl = result.url;
+          setAggData(prev => prev.map(ev => 
+            ev.id === currentHomeEvent.id 
+              ? { ...ev, gallery: [...(ev.gallery || []), newUrl] }
+              : ev
+          ));
+        } else {
+          setUploadStatus("Error.");
+        }
+      } catch (err) {
+        setUploadStatus("Error.");
+      }
+      setTimeout(() => setUploadStatus(null), 3000);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const navItems = [
     { id: 'main', label: 'Overview', icon: LayoutDashboard },
     { id: 'insights', label: 'Insights & Planning', icon: TrendingUp },
     { id: 'participant', label: 'Engagement Tracker', icon: Users },
     { id: 'settings', label: 'Settings', icon: Settings, subItems: [ { id: 'events', label: 'Event Details', icon: List }, { id: 'data', label: 'Data Management', icon: Database } ] }
   ];
+
+  const handleDownload = (url) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'event-photo.jpg');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
 
   return (
     <div className="flex h-screen w-full" style={{ backgroundColor: BRAND.colors.bg, color: BRAND.colors.text, fontFamily: BRAND.font }}>
@@ -842,6 +898,50 @@ Data for current event ("${currentHomeEvent.theme}"):
                   <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl font-black mb-2">{currentHomeEvent.insightful}</div><DeltaIndicator current={currentHomeEvent.insightful} previous={prevHomeEvent?.insightful}/></Card>
                   <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl font-black mb-2">{currentHomeEvent.logistics}</div><DeltaIndicator current={currentHomeEvent.logistics} previous={prevHomeEvent?.logistics}/></Card>
                 </div>
+
+                <Card className="p-6">
+                  <div className="flex justify-between items-center mb-6 text-black">
+                    <h3 className="text-lg font-black flex items-center gap-2">
+                      <ImageIcon className="w-5 h-5 text-[#ED1C24]" /> 
+                      Event Gallery
+                    </h3>
+                    {uploadStatus && <span className="text-[10px] font-black uppercase text-[#ED1C24] animate-pulse">{uploadStatus}</span>}
+                  </div>
+                  
+                  <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth">
+                    {/* Upload Card */}
+                    <label 
+                      className={`flex-shrink-0 w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all ${isDragging ? 'border-[#ED1C24] bg-red-50' : 'border-[#EEEEEE] hover:border-[#ED1C24]'}`}
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileUpload(e.dataTransfer.files[0]); }}
+                    >
+                      <Plus className="w-6 h-6 text-[#9C9B9C]" />
+                      <span className="text-[10px] font-black text-[#9C9B9C] uppercase mt-1 text-center px-4">Drag photo or upload</span>
+                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e.target.files[0])} />
+                    </label>
+
+                    {(currentHomeEvent.gallery || []).map((url, idx) => (
+                      <div key={idx} className="flex-shrink-0 w-48 h-32 relative group rounded-lg overflow-hidden border border-[#EEEEEE] bg-gray-50 shadow-sm">
+                        <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                          <button onClick={() => setExpandedImage(url)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all transform hover:scale-110">
+                            <MousePointer2 className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => handleDownload(url)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all transform hover:scale-110">
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {(!currentHomeEvent.gallery || currentHomeEvent.gallery.length === 0) && (
+                      <div className="flex-1 min-w-[200px] flex items-center text-[#9C9B9C] text-xs italic">
+                        No photos captured for this event yet.
+                      </div>
+                    )}
+                  </div>
+                </Card>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-2 space-y-6">
