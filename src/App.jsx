@@ -624,7 +624,7 @@ export default function App() {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
 
-  const [webhookUrl, setWebhookUrl] = useState("https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec");
+  const [webhookUrl, setWebhookUrl] = useState("[https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec](https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec)");
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
@@ -671,6 +671,7 @@ export default function App() {
 
   useEffect(() => {
     fetchAllData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const completedEvents = useMemo(() => {
