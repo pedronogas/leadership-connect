@@ -96,7 +96,7 @@ const DeltaIndicator = ({ current, previous }) => {
 };
 
 const callGemini = async (prompt, systemInstruction = "You are a professional business analyst for Celfocus.") => {
-  const apiKey = "AIzaSyBuZiTsUV4PLuwq1DTpWvRRsuHw7KlQyBY";
+  const apiKey = "";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   try {
     const response = await fetch(url, {
@@ -161,7 +161,50 @@ function InsightsPage({ completedEvents, brand }) {
   const handleAnalyze = async () => {
     if (!metrics) return;
     setIsAnalyzing(true);
-    const prompt = `Analyze performance: Avg Attendance ${metrics.avgAttendance}%, Avg NPS ${metrics.avgNps}. Historical Data: ${JSON.stringify(trendData)}`;
+    const prompt = `Analyze the performance dashboard and produce a clean, structured executive summary based only on the information provided. The summary should be objective, concise, and easy to read.
+
+Use this exact structure:
+Overall Summary
+2 to 3 sentences describing the general performance pattern across attendance, NPS, insightful score, and logistics.
+Core Metrics
+Attendance: mention average attendance and whether it is strong or weak.
+NPS: mention average NPS and whether it suggests positive or negative sentiment.
+Insightful score: describe the overall trend.
+Logistics score: describe the overall trend.
+Include any notable high or low points shown in the dashboard.
+Best Performing Events
+Mention the highest engagement event.
+Mention the highest rated event.
+Explain briefly why these stand out based on the chart data.
+Weakest Performing Events
+Mention the lowest engagement event.
+Mention the lowest rated event.
+Note any clear patterns behind weak performance.
+Trend Observations
+Summarize the main trends visible in the historical charts.
+Highlight any months or periods with peaks, drops, or divergence between metrics.
+Mention whether attendance and NPS move together or not.
+Mention whether insightful and logistics scores appear aligned or diverging.
+Recommendations
+Provide 3 to 5 specific actions.
+Focus on improving low-performing events, maintaining high-performing formats, and reducing drops in engagement or logistics.
+
+Formatting rules:
+Use short paragraphs and bullets.
+Keep language factual and direct.
+Do not use markdown symbols like ###, **, or inline labels inside the text.
+Do not repeat the same insight in multiple sections.
+Do not add assumptions beyond the data provided.
+
+Data to analyze:
+- Average Attendance: ${metrics.avgAttendance}%
+- Average NPS: ${metrics.avgNps}
+- Best Attendance: ${metrics.bestAttEvent?.theme} (${metrics.bestAttEvent?.attendance}%)
+- Best NPS: ${metrics.bestNpsEvent?.theme} (${metrics.bestNpsEvent?.nps})
+- Lowest Attendance: ${metrics.worstAttEvent?.theme} (${metrics.worstAttEvent?.attendance}%)
+- Lowest NPS: ${metrics.worstNpsEvent?.theme} (${metrics.worstNpsEvent?.nps})
+- Historical Trend Data: ${JSON.stringify(trendData)}`;
+
     const res = await callGemini(prompt);
     setAiRecs(res);
     setIsAnalyzing(false);
@@ -314,6 +357,29 @@ function ParticipantTrackerPage({ partData, aggData }) {
     return { total, inP, rem, pref: total === 0 ? 'N/A' : (inP >= rem ? 'In-person' : 'Remote') };
   }, [history]);
 
+  const handleConsult = async () => {
+    setIsConsulting(true);
+    const prompt = `Provide engagement advice for the participant "${selectedPerson}".
+Event History: ${JSON.stringify(history)}
+
+Use this exact structure:
+Summary
+1-2 sentences summarizing their general attendance pattern.
+Trend Observations
+Note if they prefer In-person or Remote, and if their attendance is consistent, improving, or dropping based on the dates.
+Recommendations
+1-2 actionable tips to maintain or improve their engagement for future events.
+
+Formatting rules:
+Keep it brief, factual, and direct. 
+Do not use markdown symbols like ### or **.
+Do not add assumptions beyond the provided history.`;
+
+    const res = await callGemini(prompt);
+    setAiAdvice(res);
+    setIsConsulting(false);
+  };
+
   return (
     <div className="space-y-6 text-sm text-black">
       <div className="flex justify-between items-end mb-4">
@@ -359,7 +425,7 @@ function ParticipantTrackerPage({ partData, aggData }) {
               </div>
             )}
           </div>
-          <button onClick={async () => { setIsConsulting(true); const res = await callGemini(`Advise on engagement for ${selectedPerson}. History: ${JSON.stringify(history)}`); setAiAdvice(res); setIsConsulting(false); }} className="bg-black hover:bg-[#333333] text-white px-4 h-[42px] rounded flex items-center gap-2 text-xs font-black transition-all disabled:opacity-50 uppercase tracking-widest active:scale-[0.98]"><Send size={16} />Advice</button>
+          <button onClick={handleConsult} disabled={isConsulting} className="bg-black hover:bg-[#333333] text-white px-4 h-[42px] rounded flex items-center gap-2 text-xs font-black transition-all disabled:opacity-50 uppercase tracking-widest active:scale-[0.98]"><Send size={16} />Advice</button>
         </div>
       </div>
       {aiAdvice && (
@@ -604,12 +670,28 @@ export default function App() {
     });
   }, [aggData]);
 
-  const latestEventId = useMemo(() => completedEvents.length > 0 ? completedEvents[completedEvents.length - 1].id : '', [completedEvents]);
+  const latestEventIdWithData = useMemo(() => {
+    if (completedEvents.length === 0) return '';
+    // Reverse search to find the most recent event that actually has participants mapped to it
+    for (let i = completedEvents.length - 1; i >= 0; i--) {
+      const ev = completedEvents[i];
+      const targetY = normalize(ev.year);
+      const targetM = robustNormalizeMonth(ev.month).toLowerCase();
+      const hasParticipants = partData.some(p => 
+        normalize(p.year) === targetY && 
+        robustNormalizeMonth(p.month).toLowerCase() === targetM
+      );
+      if (hasParticipants) return ev.id;
+    }
+    // Fallback to the absolute latest completed event if none have roster data
+    return completedEvents[completedEvents.length - 1].id;
+  }, [completedEvents, partData]);
+
   const [selectedHomeEventId, setSelectedHomeEventId] = useState('');
   const currentHomeEvent = useMemo(() => {
-    const idToFind = selectedHomeEventId === '' ? latestEventId : Number(selectedHomeEventId);
+    const idToFind = selectedHomeEventId === '' ? latestEventIdWithData : Number(selectedHomeEventId);
     return completedEvents.find(e => e.id === idToFind) || completedEvents[completedEvents.length - 1];
-  }, [completedEvents, selectedHomeEventId, latestEventId]);
+  }, [completedEvents, selectedHomeEventId, latestEventIdWithData]);
 
   const prevHomeEvent = useMemo(() => {
     if (!currentHomeEvent) return null;
@@ -651,7 +733,29 @@ export default function App() {
     if (!currentHomeEvent) return;
     setIsSummarizing(true);
     try {
-      const res = await callGemini(`Summary for ${currentHomeEvent.theme}. NPS ${currentHomeEvent.nps}, Att ${currentHomeEvent.attendance}%`);
+      const prompt = `Produce a structured executive summary for the event "${currentHomeEvent.theme}". 
+Data: 
+- Attendance: ${currentHomeEvent.attendance}%
+- NPS: ${currentHomeEvent.nps}
+- Insightful Score: ${currentHomeEvent.insightful}
+- Logistics Score: ${currentHomeEvent.logistics}
+- Host: ${currentHomeEvent.host}
+- Date: ${currentHomeEvent.month} ${currentHomeEvent.year}
+
+Use this exact structure:
+Event Summary
+Provide 2 sentences summarizing the overall success of the event based on the metrics.
+Strengths
+List 1-2 positive highlights (e.g., high attendance, good NPS, or strong insightful score).
+Risks
+List 1-2 areas of concern or lower performance.
+Actions
+Provide 1-2 specific actionable recommendations for the next event based on this data.
+
+Formatting rules:
+Keep it factual and direct. Do not use markdown symbols like ### or **. Use plain text.`;
+      
+      const res = await callGemini(prompt);
       setExecSummary(res);
       addLog('info', 'AI Summary generated.');
     } catch (e) { setExecSummary("Error generating summary."); } finally { setIsSummarizing(false); }
@@ -751,7 +855,7 @@ export default function App() {
                 <div className="flex justify-between items-start gap-4 text-black">
                   <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-black">Event Analysis</h1>
-                    <select value={selectedHomeEventId} onChange={e => setSelectedHomeEventId(e.target.value)} className="border rounded px-3 py-1 text-sm font-bold bg-white text-[#ED1C24] outline-none">{completedEvents.map(e => <option key={`opt-ev-${e.id}`} value={e.id}>{e.month} {e.year}</option>)}</select>
+                    <select value={selectedHomeEventId === '' ? latestEventIdWithData : selectedHomeEventId} onChange={e => setSelectedHomeEventId(e.target.value)} className="border rounded px-3 py-1 text-sm font-bold bg-white text-[#ED1C24] outline-none">{completedEvents.map(e => <option key={`opt-ev-${e.id}`} value={e.id}>{e.month} {e.year}</option>)}</select>
                   </div>
                   <button onClick={handleGenerateSummary} disabled={isSummarizing} className="bg-black text-white px-5 py-2.5 rounded shadow-sm flex items-center gap-2 text-sm font-bold hover:bg-neutral-800 transition-all"><Sparkles size={16}/> AI Summary</button>
                 </div>
@@ -792,19 +896,19 @@ export default function App() {
                   <div className="lg:col-span-2 space-y-6">
                     <Card className="p-6 min-h-[300px]"><h3 className="text-lg font-black mb-4 flex items-center gap-2"><Clock size={20} className="text-[#ED1C24]" /> Event Agenda</h3><ul className="space-y-2">{(currentHomeEvent.agenda || []).map((a, i) => (<li key={`agenda-${i}`} className="p-3 bg-[#F8F8F8] border rounded-sm text-xs font-black">{a.topic}<div className="text-[10px] text-[#9C9B9C] uppercase mt-1 font-bold">{a.speaker}</div></li>))}</ul></Card>
                     <Card className="flex flex-col">
-                      <div className="p-5 border-b border-[#EEEEEE] flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-black">
+                      <div className="p-5 border-b border-[#EEEEEE] flex flex-col lg:flex-row lg:items-center justify-between gap-4 text-black">
                         <div className="shrink-0">
                           <h3 className="text-lg font-black">Attendee Roster</h3>
                           <p className="text-[10px] font-black text-[#9C9B9C] uppercase tracking-wider">{eventTotalPresent} Present / {eventParticipants.length} Invited</p>
                         </div>
-                        <div className="flex flex-wrap items-center gap-3">
-                          <div className="relative grow sm:grow-0">
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                          <div className="relative grow">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9C9B9C]" size={14} />
                             <input type="text" placeholder="Search..." className="w-full pl-9 pr-4 py-2 border border-[#C7C8CA] rounded text-xs outline-none focus:border-[#ED1C24] transition-all" value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} />
                           </div>
-                          <div className="flex bg-[#F8F8F8] p-1 rounded border shrink-0 overflow-x-auto">
+                          <div className="flex bg-[#F8F8F8] p-1 rounded border shrink-0 overflow-x-auto no-scrollbar">
                             {['All', 'In-person', 'Remote', 'Absent'].map(tab => (
-                              <button key={`filter-${tab}`} onClick={() => setRosterFilter(tab)} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded transition-all whitespace-nowrap ${rosterFilter === tab ? 'bg-white text-[#ED1C24] shadow-sm' : 'text-[#636466]'}`}>{tab}</button>
+                              <button key={`filter-${tab}`} onClick={() => setRosterFilter(tab)} className={`flex-1 sm:flex-none px-3 py-1.5 text-[10px] font-black uppercase rounded transition-all whitespace-nowrap ${rosterFilter === tab ? 'bg-white text-[#ED1C24] shadow-sm' : 'text-[#636466] hover:bg-white/50'}`}>{tab}</button>
                             ))}
                           </div>
                         </div>
@@ -863,8 +967,8 @@ export default function App() {
                 </div>
               </div>
             )}
-            {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} callGemini={callGemini} />}
-            {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} brand={BRAND} callGemini={callGemini} />}
+            {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} />}
+            {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} />}
             {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} />}
             {activeTab === 'data' && <DataManagementPage aggData={aggData} partData={partData} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
             {activeTab === 'debug' && <DebugConsolePage logs={logs} clearLogs={() => setLogs([])} />}
