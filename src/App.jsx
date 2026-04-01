@@ -96,7 +96,7 @@ const DeltaIndicator = ({ current, previous }) => {
 };
 
 const callGemini = async (prompt, systemInstruction = "You are a professional business analyst for Celfocus.") => {
-  const apiKey = "AIzaSyBuZiTsUV4PLuwq1DTpWvRRsuHw7KlQyBY";
+  const apiKey = "";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   try {
     const response = await fetch(url, {
@@ -459,7 +459,7 @@ function DataManagementPage({ aggData, partData, fetchAllData, isConnecting, con
   const handleSync = async () => {
     setIsSaving(true);
     try {
-      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery.map(g => g.url || g)) : "[]" }));
+      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery) : "[]" }));
       const agendasToSync = localData.map(e => ({ year: e.year, month: e.month, slots: [e.agenda?.[0] || {topic:"",speaker:"",artifact:""}, e.agenda?.[1] || {topic:"",speaker:"",artifact:""}, e.agenda?.[2] || {topic:"",speaker:"",artifact:""}] }));
       await fetch(webhookUrl, { method: 'POST', body: JSON.stringify({ action: 'syncData', events: eventsToSync, participants: localPartData, agendas: agendasToSync }) });
       setSaveSuccess(true);
@@ -636,7 +636,16 @@ export default function App() {
         } catch(e) {
           parsedGallery = r.gallery ? [r.gallery] : [];
         }
-        parsedGallery = parsedGallery.map(g => typeof g === 'object' ? g.url : g).filter(Boolean);
+        // Normalize gallery objects to {id, url} format
+        parsedGallery = parsedGallery.map(g => {
+          if (typeof g === 'object' && g.id && g.url) return g;
+          if (typeof g === 'string') {
+             const match = g.match(/[?&]id=([^&]+)/);
+             const id = match ? match[1] : g;
+             return { id, url: g, original: g };
+          }
+          return null;
+        }).filter(Boolean);
 
         return { 
           id: i + 100, year: String(r.year || ''), month: String(r.month || ''), 
@@ -672,18 +681,11 @@ export default function App() {
 
   const latestEventIdWithData = useMemo(() => {
     if (completedEvents.length === 0) return '';
-    // Reverse search to find the most recent event that actually has participants mapped to it
     for (let i = completedEvents.length - 1; i >= 0; i--) {
       const ev = completedEvents[i];
-      const targetY = normalize(ev.year);
-      const targetM = robustNormalizeMonth(ev.month).toLowerCase();
-      const hasParticipants = partData.some(p => 
-        normalize(p.year) === targetY && 
-        robustNormalizeMonth(p.month).toLowerCase() === targetM
-      );
+      const hasParticipants = partData.some(p => normalize(p.year) === normalize(ev.year) && robustNormalizeMonth(p.month).toLowerCase() === robustNormalizeMonth(ev.month).toLowerCase());
       if (hasParticipants) return ev.id;
     }
-    // Fallback to the absolute latest completed event if none have roster data
     return completedEvents[completedEvents.length - 1].id;
   }, [completedEvents, partData]);
 
@@ -699,8 +701,15 @@ export default function App() {
     return idx > 0 ? completedEvents[idx - 1] : null;
   }, [completedEvents, currentHomeEvent]);
 
+  // Transform photos to use the Google Drive thumbnail endpoint for reliable rendering
   const filteredPhotos = useMemo(() => {
-    return (currentHomeEvent?.gallery || []).map((url, idx) => ({ url, name: `Photo ${idx + 1}` }));
+    return (currentHomeEvent?.gallery || []).map((item, idx) => ({ 
+      id: item.id,
+      url: item.url,
+      thumbnailUrl: `https://drive.google.com/thumbnail?id=${item.id}&sz=w800`,
+      originalRef: item.original || item,
+      name: `Photo ${idx + 1}` 
+    }));
   }, [currentHomeEvent]);
 
   const eventParticipants = useMemo(() => {
@@ -712,15 +721,10 @@ export default function App() {
 
   const filteredParticipants = useMemo(() => {
     let list = [...eventParticipants];
-
     if (rosterFilter === 'In-person') list = list.filter(p => p.attendanceType === 'In-person');
     else if (rosterFilter === 'Remote') list = list.filter(p => p.attendanceType === 'Remote');
     else if (rosterFilter === 'Absent') list = list.filter(p => !p.attendanceType);
-
-    if (rosterSearch.trim()) {
-      list = list.filter(p => (p.participantName || "").toLowerCase().includes(rosterSearch.toLowerCase()));
-    }
-
+    if (rosterSearch.trim()) list = list.filter(p => (p.participantName || "").toLowerCase().includes(rosterSearch.toLowerCase()));
     return list.sort((a, b) => (a.participantName || "").localeCompare(b.participantName || ""));
   }, [eventParticipants, rosterSearch, rosterFilter]);
 
@@ -761,34 +765,100 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
     } catch (e) { setExecSummary("Error generating summary."); } finally { setIsSummarizing(false); }
   };
 
-  const handleFileUpload = async (file) => {
-    if (!file) return;
-    addLog('info', `Starting upload: ${file.name}`);
-    const validExts = ['.heic', '.heif', '.jpg', '.jpeg', '.png'];
-    const fileName = file.name.toLowerCase();
-    if (!validExts.some(ext => fileName.endsWith(ext))) {
-      addLog('error', 'Invalid format blocked'); setUploadStatus("Invalid Format"); return;
+  const uploadSingleFile = async (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64 = e.target.result.split(',')[1];
+        const targetName = `${currentHomeEvent.year}_${currentHomeEvent.month}_${file.name.replace(/\s+/g, '_')}`;
+        try {
+          const response = await fetch(webhookUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'uploadImage', year: currentHomeEvent.year, month: currentHomeEvent.month, fileName: targetName, mimeType: file.type || 'image/jpeg', fileData: base64 })
+          });
+          const result = await response.json();
+          if (result.status === 'success') {
+             addLog('success', `Uploaded ${file.name}`);
+             resolve(true);
+          } else {
+             addLog('error', `Upload failed: ${file.name}`, result.message);
+             resolve(false);
+          }
+        } catch (err) { 
+          addLog('error', `Network error: ${file.name}`, err.toString()); 
+          resolve(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileUpload = async (files) => {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    
+    // Filter limits and types
+    const validFiles = fileArray.filter(file => {
+      const validExts = ['.heic', '.heif', '.jpg', '.jpeg', '.png'];
+      const fileName = file.name.toLowerCase();
+      if (!validExts.some(ext => fileName.endsWith(ext))) {
+        addLog('error', `Invalid format blocked: ${file.name}`);
+        return false;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`File ${file.name} exceeds the 5MB limit and was blocked.`);
+        addLog('error', `File too large: ${file.name}`);
+        return false;
+      }
+      return true;
+    });
+
+    if (filteredPhotos.length + validFiles.length > 10) {
+      alert(`Upload blocked. You can only have a maximum of 10 photos per event. You are trying to add ${validFiles.length} to an existing ${filteredPhotos.length}.`);
+      return;
     }
-    setUploadStatus("Uploading...");
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = e.target.result.split(',')[1];
-      const targetName = `${currentHomeEvent.year}_${currentHomeEvent.month}_${file.name.replace(/\s+/g, '_')}`;
-      try {
-        const response = await fetch(webhookUrl, {
-          method: 'POST',
-          body: JSON.stringify({ action: 'uploadImage', year: currentHomeEvent.year, month: currentHomeEvent.month, fileName: targetName, mimeType: file.type || 'image/jpeg', fileData: base64 })
-        });
-        const result = await response.json();
-        if (result.status === 'success') {
-          addLog('success', 'Uploaded successfully.', `URL: ${result.url}`);
-          setUploadStatus("Success!"); 
-          fetchAllData(); // Refresh to fetch newly appended gallery URL from DB
-        } else { addLog('error', 'Upload failed', result.message); setUploadStatus("Error."); }
-      } catch (err) { addLog('error', 'Network upload error', err.toString()); setUploadStatus("Error."); }
-      setTimeout(() => setUploadStatus(null), 3000);
-    };
-    reader.readAsDataURL(file);
+
+    if (validFiles.length === 0) return;
+
+    let uploaded = 0;
+    setUploadStatus(`Uploading 0/${validFiles.length}...`);
+    for (const file of validFiles) {
+      await uploadSingleFile(file);
+      uploaded++;
+      setUploadStatus(`Uploading ${uploaded}/${validFiles.length}...`);
+    }
+    
+    setUploadStatus("Success!"); 
+    setTimeout(() => setUploadStatus(null), 3000);
+    fetchAllData(); 
+  };
+
+  const handleDeleteImage = async (photo) => {
+    if (!confirm("Are you sure you want to permanently delete this image from Drive?")) return;
+    setUploadStatus("Deleting...");
+    addLog('info', `Deleting image ID: ${photo.id}`);
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'deleteImage',
+          year: currentHomeEvent.year,
+          month: currentHomeEvent.month,
+          fileId: photo.id,
+          itemToRemove: photo.originalRef 
+        })
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        addLog('success', 'Image successfully deleted from Drive and Sheet.');
+        fetchAllData();
+      } else {
+        addLog('error', 'Delete failed', result.message);
+      }
+    } catch(e) {
+      addLog('error', 'Network delete error', e.toString());
+    }
+    setUploadStatus(null);
   };
 
   const navItems = [
@@ -868,20 +938,21 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
                 </div>
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-6 text-black">
-                    <h3 className="text-lg font-black flex items-center gap-2"><ImageIcon size={20} className="text-[#ED1C24]" /> Event Gallery</h3>
+                    <h3 className="text-lg font-black flex items-center gap-2"><ImageIcon size={20} className="text-[#ED1C24]" /> Event Gallery <span className="text-[10px] font-bold text-[#9C9B9C] uppercase tracking-wider ml-2 bg-[#F8F8F8] px-2 py-1 rounded">{filteredPhotos.length}/10</span></h3>
                     <div className="flex items-center gap-4">{uploadStatus && <span className="text-[10px] font-black uppercase text-[#ED1C24] animate-pulse">{uploadStatus}</span>}</div>
                   </div>
-                  <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth">
-                    <label className={`flex-shrink-0 w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer border-[#EEEEEE] hover:border-[#ED1C24] hover:bg-red-50`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files[0]); }}>
-                      <Plus size={24} className="text-[#9C9B9C]" /><span className="text-[10px] font-black text-[#9C9B9C] uppercase mt-1 text-center">Upload HEIC/JPG/PNG</span>
-                      <input type="file" className="hidden" accept=".heic, .heif, .jpg, .jpeg, .png" onChange={(e) => handleFileUpload(e.target.files[0])} />
+                  <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth items-center">
+                    <label className={`flex-shrink-0 w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer border-[#EEEEEE] hover:border-[#ED1C24] hover:bg-red-50 transition-colors ${filteredPhotos.length >= 10 ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''}`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files); }}>
+                      <Plus size={24} className="text-[#9C9B9C]" />
+                      <span className="text-[10px] font-black text-[#9C9B9C] uppercase mt-1 text-center px-4">Upload <br/>(Max 5MB)</span>
+                      <input type="file" multiple className="hidden" accept=".heic, .heif, .jpg, .jpeg, .png" onChange={(e) => handleFileUpload(e.target.files)} disabled={filteredPhotos.length >= 10} />
                     </label>
                     {filteredPhotos.map((img, idx) => (
                       <div key={`photo-${idx}`} className="flex-shrink-0 w-48 h-32 relative group rounded-lg overflow-hidden border bg-gray-50 shadow-sm transition-transform hover:scale-[1.02]">
-                        <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
+                        <img src={img.thumbnailUrl} alt={img.name} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                          <button onClick={() => setExpandedImage(img.url)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all"><MousePointer2 size={16} /></button>
-                          <a href={img.url} target="_blank" rel="noreferrer" className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all"><Download size={16} /></a>
+                          <button onClick={() => setExpandedImage(img.thumbnailUrl.replace('w800', 'w2000'))} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all text-black"><MousePointer2 size={16} /></button>
+                          <button onClick={() => handleDeleteImage(img)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all text-black"><Trash2 size={16} /></button>
                         </div>
                       </div>
                     ))}
@@ -967,8 +1038,8 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
                 </div>
               </div>
             )}
-            {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} />}
-            {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} />}
+            {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} callGemini={callGemini} />}
+            {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} brand={BRAND} callGemini={callGemini} />}
             {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} />}
             {activeTab === 'data' && <DataManagementPage aggData={aggData} partData={partData} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
             {activeTab === 'debug' && <DebugConsolePage logs={logs} clearLogs={() => setLogs([])} />}
@@ -977,8 +1048,8 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
       </div>
       {expandedImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" onClick={() => setExpandedImage(null)}>
-          <img src={expandedImage} className="max-w-full max-h-full object-contain rounded" alt="Full" />
-          <button className="absolute top-6 right-6 text-white bg-white/20 p-2 rounded-full hover:bg-white/40"><X size={24}/></button>
+          <img src={expandedImage} className="max-w-full max-h-full object-contain rounded shadow-2xl border border-white/10" alt="Full Preview" />
+          <button className="absolute top-6 right-6 text-white bg-white/20 p-2 rounded-full hover:bg-[#ED1C24] transition-colors"><X size={24}/></button>
         </div>
       )}
     </div>
