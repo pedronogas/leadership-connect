@@ -96,7 +96,7 @@ const DeltaIndicator = ({ current, previous }) => {
 };
 
 const callGemini = async (prompt, systemInstruction = "You are a professional business analyst for Celfocus.") => {
-  const apiKey = "";
+  const apiKey = "AIzaSyBuZiTsUV4PLuwq1DTpWvRRsuHw7KlQyBY";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   try {
     const response = await fetch(url, {
