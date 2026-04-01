@@ -4,7 +4,7 @@ import {
   ComposedChart, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  LayoutDashboard, TrendingUp, Users, Database, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Monitor, Save, CheckCircle, Clock, ExternalLink, Image as ImageIcon, Plus, X, List, Trash2, Pencil, Search, Star, TrendingDown, Lightbulb, Settings, Send, FileText, Upload, Sparkles, BrainCircuit, Download, MousePointer2
+  LayoutDashboard, TrendingUp, Users, Database, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Monitor, Save, CheckCircle, Clock, ExternalLink, Image as ImageIcon, Plus, X, List, Trash2, Pencil, Search, Star, TrendingDown, Lightbulb, Settings, Send, FileText, Upload, Sparkles, BrainCircuit, Download, MousePointer2, Loader2, Bug, Terminal, AlertCircle, Menu
 } from 'lucide-react';
 
 // --- Celfocus Branding Guidelines V2.0 ---
@@ -72,11 +72,14 @@ const getInitials = (name) => {
   return name.substring(0, 2).toUpperCase();
 };
 
-const Avatar = ({ name, className = "" }) => (
-  <div className={`flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-[#EEEEEE] text-[#000000] font-black text-xs border border-[#C7C8CA] ${className}`}>
-    {getInitials(name)}
-  </div>
-);
+const Avatar = ({ name, className = "" }) => {
+  const initials = name ? name.trim().split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() : "U";
+  return (
+    <div className={`flex shrink-0 items-center justify-center w-8 h-8 rounded-full bg-[#EEEEEE] text-[#000000] font-black text-xs border border-[#C7C8CA] ${className}`}>
+      {initials}
+    </div>
+  );
+};
 
 const DeltaIndicator = ({ current, previous }) => {
   if (current === null || previous === null || current === undefined || previous === undefined) return null;
@@ -85,90 +88,47 @@ const DeltaIndicator = ({ current, previous }) => {
   const isNegative = delta < 0;
   return (
     <div className={`flex items-center text-sm font-bold ${isPositive ? 'text-[#719F81]' : isNegative ? 'text-[#ED1C24]' : 'text-[#9C9B9C]'}`}>
-      {isPositive ? <ChevronUp className="w-4 h-4 mr-1" strokeWidth={3} /> : (isNegative ? <ChevronDown className="w-4 h-4 mr-1" strokeWidth={3} /> : <Minus className="w-4 h-4 mr-1" strokeWidth={3} />)}
+      {isPositive ? <ChevronUp size={16} /> : (isNegative ? <ChevronDown size={16} /> : <Minus size={16} />)}
       <span>{Math.abs(delta)}</span>
       <span className="text-[#9C9B9C] ml-1 font-normal text-xs">vs prev</span>
     </div>
   );
 };
 
-// --- Gemini API Helper ---
-const apiKey = "";
 const callGemini = async (prompt, systemInstruction = "You are a professional business analyst for Celfocus.") => {
+  const apiKey = "";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-  
-  const attempt = async (retryCount = 0) => {
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          systemInstruction: { parts: [{ text: systemInstruction }] }
-        })
-      });
-
-      if (!response.ok) {
-        if (retryCount < 5) {
-          const delay = Math.pow(2, retryCount) * 1000;
-          await new Promise(res => setTimeout(res, delay));
-          return attempt(retryCount + 1);
-        }
-        throw new Error("API Connection Failed");
-      }
-
-      const result = await response.json();
-      return result.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
-    } catch (error) {
-      if (retryCount < 5) {
-        const delay = Math.pow(2, retryCount) * 1000;
-        await new Promise(res => setTimeout(res, delay));
-        return attempt(retryCount + 1);
-      }
-      throw error;
-    }
-  };
-
-  return attempt();
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        systemInstruction: { parts: [{ text: systemInstruction }] }
+      })
+    });
+    const result = await response.json();
+    return result.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+  } catch (e) {
+    return "AI generation currently unavailable.";
+  }
 };
 
-// --- Custom AI Formatting Component ---
 const CleanAISummary = ({ text }) => {
   if (!text) return null;
   const lines = text.split('\n');
-  
   return (
     <div className="text-sm font-medium leading-relaxed pr-8 text-black">
       {lines.map((line, i) => {
         let cleanLine = line.trim().replace(/\*\*/g, '').replace(/^#+\s*/, '');
         if (!cleanLine) return null;
-
         const lowerLine = cleanLine.toLowerCase();
-        const isHeader = lowerLine.includes('summary') || 
-                         lowerLine.includes('strengths') || 
-                         lowerLine.includes('risks') || 
-                         lowerLine.includes('actions') ||
-                         lowerLine.includes('core metrics') ||
-                         lowerLine.includes('best performing') ||
-                         lowerLine.includes('weakest performing') ||
-                         lowerLine.includes('trend observations') ||
-                         lowerLine.includes('recommendations');
-
+        const isHeader = lowerLine.includes('summary') || lowerLine.includes('strengths') || lowerLine.includes('risks') || lowerLine.includes('actions') || lowerLine.includes('metrics') || lowerLine.includes('performing') || lowerLine.includes('trend') || lowerLine.includes('recommendations');
         if (isHeader && cleanLine.length < 35) {
-          return (
-            <div key={i} className={`font-black text-[15px] uppercase tracking-wider text-[#000000] ${i !== 0 ? 'mt-5' : ''} mb-2`}>
-              {cleanLine.replace(/:$/, '')}
-            </div>
-          );
+          return <div key={`header-${i}`} className={`font-black text-[15px] uppercase tracking-wider text-[#000000] ${i !== 0 ? 'mt-5' : ''} mb-2`}>{cleanLine.replace(/:$/, '')}</div>;
         }
-
         cleanLine = cleanLine.replace(/^[-*]\s*/, ''); 
-        return (
-          <div key={i} className="flex items-start gap-2 mb-2 ml-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#ED1C24] mt-1.5 shrink-0"></div>
-            <span className="flex-1 text-[#333333]">{cleanLine}</span>
-          </div>
-        );
+        return <div key={`line-${i}`} className="flex items-start gap-2 mb-2 ml-1"><div className="w-1.5 h-1.5 rounded-full bg-[#ED1C24] mt-1.5 shrink-0"></div><span className="flex-1 text-[#333333]">{cleanLine}</span></div>;
       })}
     </div>
   );
@@ -176,7 +136,7 @@ const CleanAISummary = ({ text }) => {
 
 // --- Sub-page Components ---
 
-function InsightsPage({ completedEvents, brand, callGemini }) {
+function InsightsPage({ completedEvents, brand }) {
   const [aiRecs, setAiRecs] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
@@ -185,88 +145,26 @@ function InsightsPage({ completedEvents, brand, callGemini }) {
     let sumAtt = 0, sumNps = 0;
     let maxAtt = -1, bestAttEvent = null, maxNps = -1, bestNpsEvent = null;
     let minAtt = Infinity, worstAttEvent = null, minNps = Infinity, worstNpsEvent = null;
-
     completedEvents.forEach(e => {
       sumAtt += (e.attendance || 0);
       sumNps += (e.nps || 0);
-      
-      if (e.attendance !== null && e.attendance !== undefined) {
-        if (e.attendance > maxAtt) { maxAtt = e.attendance; bestAttEvent = e; }
-        if (e.attendance < minAtt) { minAtt = e.attendance; worstAttEvent = e; }
-      }
-      
-      if (e.nps !== null && e.nps !== undefined) {
-        if (e.nps > maxNps) { maxNps = e.nps; bestNpsEvent = e; }
-        if (e.nps < minNps) { minNps = e.nps; worstNpsEvent = e; }
-      }
+      if (e.attendance !== null && e.attendance > maxAtt) { maxAtt = e.attendance; bestAttEvent = e; }
+      if (e.attendance !== null && e.attendance < minAtt) { minAtt = e.attendance; worstAttEvent = e; }
+      if (e.nps !== null && e.nps > maxNps) { maxNps = e.nps; bestNpsEvent = e; }
+      if (e.nps !== null && e.nps < minNps) { minNps = e.nps; worstNpsEvent = e; }
     });
-
-    return {
-      avgAttendance: Math.round(sumAtt / completedEvents.length),
-      avgNps: Math.round(sumNps / completedEvents.length),
-      bestAttEvent, worstAttEvent, bestNpsEvent, worstNpsEvent
-    };
+    return { avgAttendance: Math.round(sumAtt / completedEvents.length), avgNps: Math.round(sumNps / completedEvents.length), bestAttEvent, worstAttEvent, bestNpsEvent, worstNpsEvent };
   }, [completedEvents]);
 
-  const trendData = completedEvents.map(e => ({ 
-    name: `${e.month.substring(0,3)} ${e.year}`, 
-    Attendance: e.attendance, 
-    NPS: e.nps,
-    Insightful: e.insightful,
-    Logistics: e.logistics
-  }));
+  const trendData = completedEvents.map(e => ({ name: `${e.month.substring(0,3)} ${e.year}`, Attendance: e.attendance, NPS: e.nps, Insightful: e.insightful, Logistics: e.logistics }));
 
   const handleAnalyze = async () => {
+    if (!metrics) return;
     setIsAnalyzing(true);
-    try {
-      const prompt = `Analyze the performance dashboard and produce a clean, structured executive summary based only on the information visible in the dashboard. The summary should be objective, concise, and easy to read.
-
-Use this exact structure:
-Overall Summary
-2 to 3 sentences describing the general performance pattern across attendance, NPS, insightful score, and logistics.
-Core Metrics
-Attendance: mention average attendance and whether it is strong or weak.
-NPS: mention average NPS and whether it suggests positive or negative sentiment.
-Insightful score: describe the overall trend.
-Logistics score: describe the overall trend.
-Include any notable high or low points shown in the dashboard.
-Best Performing Events
-Mention the highest engagement event.
-Mention the highest rated event.
-Explain briefly why these stand out based on the chart data.
-Weakest Performing Events
-Mention the lowest engagement event.
-Mention the lowest rated event.
-Note any clear patterns behind weak performance.
-Trend Observations
-Summarize the main trends visible in the historical charts.
-Highlight any months or periods with peaks, drops, or divergence between metrics.
-Mention whether attendance and NPS move together or not.
-Mention whether insightful and logistics scores appear aligned or diverging.
-Recommendations
-Provide 3 to 5 specific actions.
-Focus on improving low-performing events, maintaining high-performing formats, and reducing drops in engagement or logistics.
-
-Formatting rules:
-Use short paragraphs and bullets.
-Keep language factual and direct.
-Do not use markdown symbols like ###, **, or inline labels inside the text.
-Do not repeat the same insight in multiple sections.
-Do not add assumptions beyond the dashboard.
-Use plain business language suitable for an executive audience.
-
-Data to analyze:
-- Average Attendance: ${metrics.avgAttendance}%
-- Average NPS: ${metrics.avgNps}
-- Best Attendance: ${metrics.bestAttEvent?.theme} (${metrics.bestAttEvent?.attendance}%)
-- Best NPS: ${metrics.bestNpsEvent?.theme} (${metrics.bestNpsEvent?.nps})
-- Lowest Attendance: ${metrics.worstAttEvent?.theme} (${metrics.worstAttEvent?.attendance}%)
-- Lowest NPS: ${metrics.worstNpsEvent?.theme} (${metrics.worstNpsEvent?.nps})
-- Historical Trend Data: ${JSON.stringify(trendData)}`;
-
-      const res = await callGemini(prompt);
-      setAiRecs(res);
-    } catch (e) { setAiRecs("Analysis failed."); } finally { setIsAnalyzing(false); }
+    const prompt = `Analyze performance: Avg Attendance ${metrics.avgAttendance}%, Avg NPS ${metrics.avgNps}. Historical Data: ${JSON.stringify(trendData)}`;
+    const res = await callGemini(prompt);
+    setAiRecs(res);
+    setIsAnalyzing(false);
   };
 
   return (
@@ -274,10 +172,9 @@ Data to analyze:
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-black">Performance Insights</h1>
         <button onClick={handleAnalyze} disabled={isAnalyzing} className="bg-[#ED1C24] hover:bg-[#811116] text-white px-5 py-2.5 rounded shadow-sm text-sm font-bold flex items-center gap-2 transition-all">
-          <BrainCircuit className="w-4 h-4" />{isAnalyzing ? "..." : "✨ AI Recommendations"}
+          <BrainCircuit size={16} />{isAnalyzing ? "..." : "✨ AI Recommendations"}
         </button>
       </div>
-      
       {metrics && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
           <Card className="p-5 border-t-4 border-t-black flex flex-col justify-center">
@@ -315,58 +212,48 @@ Data to analyze:
           </Card>
         </div>
       )}
-
-      {aiRecs && (
-        <Card className="p-6 border-l-4 border-l-[#719F81] relative animate-in slide-in-from-top duration-300">
-          <button onClick={() => setAiRecs('')} className="absolute top-4 right-4 text-[#9C9B9C] hover:text-black transition-colors"><X className="w-5 h-5"/></button>
-          <CleanAISummary text={aiRecs} />
-        </Card>
-      )}
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {aiRecs && <Card className="p-6 border-l-4 border-l-[#719F81] relative animate-in slide-in-from-top"><button onClick={() => setAiRecs('')} className="absolute top-4 right-4 text-[#9C9B9C]"><X size={20}/></button><CleanAISummary text={aiRecs} /></Card>}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-80">
         <Card className="p-6">
-          <h3 className="text-lg font-black mb-6">Historical Performance</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={brand.colors.border}/>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} />
-                <RechartsTooltip/>
-                <Legend/>
-                <Bar dataKey="Attendance" fill={brand.colors.secondary} maxBarSize={40} />
-                <Line dataKey="NPS" stroke={brand.colors.primary} strokeWidth={3} />
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={brand.colors.border}/>
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} dy={10} />
+              <YAxis axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} />
+              <RechartsTooltip/>
+              <Legend/>
+              <Bar dataKey="Attendance" fill={brand.colors.secondary} maxBarSize={40} />
+              <Line dataKey="NPS" stroke={brand.colors.primary} strokeWidth={3} />
+            </ComposedChart>
+          </ResponsiveContainer>
         </Card>
-
         <Card className="p-6">
-          <h3 className="text-lg font-black mb-6">Insightful vs Logistics Trends</h3>
-          <div className="h-80">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={brand.colors.border}/>
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} dy={10} />
-                <YAxis domain={[0, 5]} axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} />
-                <RechartsTooltip/>
-                <Legend/>
-                <Line type="monotone" dataKey="Insightful" stroke={brand.colors.purple} strokeWidth={3} />
-                <Line type="monotone" dataKey="Logistics" stroke={brand.colors.neutral} strokeWidth={3} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={trendData}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={brand.colors.border}/>
+              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} dy={10} />
+              <YAxis domain={[0, 5]} axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} />
+              <RechartsTooltip/>
+              <Legend/>
+              <Line type="monotone" dataKey="Insightful" stroke={brand.colors.purple} strokeWidth={3} />
+              <Line type="monotone" dataKey="Logistics" stroke={brand.colors.neutral} strokeWidth={3} />
+            </LineChart>
+          </ResponsiveContainer>
         </Card>
       </div>
     </div>
   );
 }
 
-function ParticipantTrackerPage({ partData, aggData, brand, callGemini }) {
-  const participantsList = useMemo(() => [...new Set(partData.map(p => p.participantName))].sort(), [partData]);
+function ParticipantTrackerPage({ partData, aggData }) {
+  const participantsList = useMemo(() => {
+    if (!partData) return [];
+    return [...new Set(partData.map(p => String(p.participantName || "")))].filter(Boolean).sort();
+  }, [partData]);
+
   const [selectedPerson, setSelectedPerson] = useState(participantsList[0] || "");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [trackerSearch, setTrackerSearch] = useState('');
   const [aiAdvice, setAiAdvice] = useState('');
   const [isConsulting, setIsConsulting] = useState(false);
 
@@ -376,14 +263,17 @@ function ParticipantTrackerPage({ partData, aggData, brand, callGemini }) {
     
     participantsList.forEach(name => counts[name] = 0);
 
-    partData.forEach(p => {
-      if (p.attendanceType === 'In-person' || p.attendanceType === 'Remote') {
-        if (counts[p.participantName] !== undefined) {
-          counts[p.participantName]++;
-          totalAtt++;
+    if (partData) {
+      partData.forEach(p => {
+        if (p.attendanceType === 'In-person' || p.attendanceType === 'Remote') {
+          const name = String(p.participantName || "");
+          if (counts[name] !== undefined) {
+            counts[name]++;
+            totalAtt++;
+          }
         }
-      }
-    });
+      });
+    }
 
     if (participantsList.length === 0) return { mostActive: { names: '-', count: 0 }, leastActive: { names: '-', count: 0 }, average: 0 };
 
@@ -410,8 +300,8 @@ function ParticipantTrackerPage({ partData, aggData, brand, callGemini }) {
   }, [partData, participantsList]);
 
   const history = useMemo(() => {
-    if (!selectedPerson) return [];
-    return partData.filter(p => p.participantName === selectedPerson && p.attendanceType).map(p => {
+    if (!selectedPerson || !partData) return [];
+    return partData.filter(p => String(p.participantName || "") === selectedPerson && p.attendanceType).map(p => {
       const e = aggData.find(ev => normalize(ev.year) === normalize(p.year) && robustNormalizeMonth(ev.month).toLowerCase() === robustNormalizeMonth(p.month).toLowerCase());
       return { ...p, eventDate: `${p.month} ${p.year}`, theme: e?.theme || '-', host: e?.host || '-', id: e?.id || 0 };
     }).sort((a,b) => b.id - a.id);
@@ -455,40 +345,40 @@ function ParticipantTrackerPage({ partData, aggData, brand, callGemini }) {
           <div className="w-72 relative">
             <label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Select Participant</label>
             <div className="w-full border border-[#C7C8CA] rounded p-2.5 text-sm font-black bg-white flex justify-between items-center cursor-pointer hover:border-[#ED1C24] transition-all" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
-              <span className="truncate">{selectedPerson || "Choose..."}</span><ChevronDown className="w-4 h-4 text-[#ED1C24]" strokeWidth={3}/>
+              <span className="truncate">{selectedPerson || "Choose..."}</span><ChevronDown size={16} className="text-[#ED1C24]" />
             </div>
             {isDropdownOpen && (
               <div className="absolute z-20 w-full mt-1 bg-white border border-[#C7C8CA] rounded shadow-lg overflow-hidden animate-in fade-in duration-200">
                 <div className="fixed inset-0 z-[-1]" onClick={() => setIsDropdownOpen(false)}></div>
-                <div className="p-2.5 border-b flex items-center gap-2 bg-[#F8F8F8]"><Search className="w-4 h-4 text-[#9C9B9C]" /><input type="text" autoFocus className="w-full text-xs font-bold outline-none bg-transparent" placeholder="Filter..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}/></div>
+                <div className="p-2.5 border-b flex items-center gap-2 bg-[#F8F8F8]"><Search size={16} className="text-[#9C9B9C]" /><input type="text" autoFocus className="w-full text-xs font-bold outline-none bg-transparent" placeholder="Filter..." value={trackerSearch} onChange={e => setTrackerSearch(e.target.value)}/></div>
                 <ul className="max-h-60 overflow-y-auto">
-                  {participantsList.filter(p => p.toLowerCase().includes(searchTerm.toLowerCase())).map(p => (
-                    <li key={p} className={`px-3 py-2.5 text-xs font-bold cursor-pointer hover:bg-[#F8F8F8] transition-colors ${selectedPerson === p ? 'text-[#ED1C24] bg-[#FF4F50]/5 border-l-4 border-[#ED1C24]' : 'text-black'}`} onClick={() => { setSelectedPerson(p); setIsDropdownOpen(false); setSearchTerm(''); }}>{p}</li>
+                  {participantsList.filter(p => p.toLowerCase().includes(trackerSearch.toLowerCase())).map(p => (
+                    <li key={`part-opt-${p}`} className={`px-3 py-2.5 text-xs font-bold cursor-pointer hover:bg-[#F8F8F8] transition-colors ${selectedPerson === p ? 'text-[#ED1C24] bg-[#FF4F50]/5 border-l-4 border-[#ED1C24]' : 'text-black'}`} onClick={() => { setSelectedPerson(p); setIsDropdownOpen(false); setTrackerSearch(''); }}>{p}</li>
                   ))}
                 </ul>
               </div>
             )}
           </div>
-          <button onClick={async () => { setIsConsulting(true); const res = await callGemini(`Advise on engagement for ${selectedPerson}. History: ${JSON.stringify(history)}`); setAiAdvice(res); setIsConsulting(false); }} className="bg-black hover:bg-[#333333] text-white px-4 h-[42px] rounded flex items-center gap-2 text-xs font-black transition-all disabled:opacity-50 uppercase tracking-widest active:scale-[0.98]"><Send className="w-4 h-4" />Advice</button>
+          <button onClick={async () => { setIsConsulting(true); const res = await callGemini(`Advise on engagement for ${selectedPerson}. History: ${JSON.stringify(history)}`); setAiAdvice(res); setIsConsulting(false); }} className="bg-black hover:bg-[#333333] text-white px-4 h-[42px] rounded flex items-center gap-2 text-xs font-black transition-all disabled:opacity-50 uppercase tracking-widest active:scale-[0.98]"><Send size={16} />Advice</button>
         </div>
       </div>
       {aiAdvice && (
         <Card className="p-5 border-l-4 border-l-[#ED1C24] relative animate-in slide-in-from-right duration-300">
-          <button onClick={() => setAiAdvice('')} className="absolute top-4 right-4 text-[#9C9B9C] hover:text-black transition-colors"><X className="w-5 h-5"/></button>
+          <button onClick={() => setAiAdvice('')} className="absolute top-4 right-4 text-[#9C9B9C] hover:text-black transition-colors"><X size={20}/></button>
           <CleanAISummary text={aiAdvice} />
         </Card>
       )}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6 flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-[#EEEEEE] flex items-center justify-center text-xl font-black">{stats.total}</div><div><div className="text-[10px] font-black text-[#636466] uppercase">Events Attended</div><div className="text-sm font-black text-[#ED1C24]">{stats.total} Sessions</div></div></Card>
-        <Card className="p-6 flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-[#FF4F50]/10 flex items-center justify-center text-[#ED1C24]">{stats.pref === 'In-person' ? <MapPin className="w-6 h-6"/> : <Monitor className="w-6 h-6"/>}</div><div><div className="text-[10px] font-black text-[#636466] uppercase">Preference</div><div className="text-sm font-black">{stats.pref}</div></div></Card>
+        <Card className="p-6 flex items-center gap-4"><div className="w-12 h-12 rounded-full bg-[#FF4F50]/10 flex items-center justify-center text-[#ED1C24]">{stats.pref === 'In-person' ? <MapPin size={24}/> : <Monitor size={24}/>}</div><div><div className="text-[10px] font-black text-[#636466] uppercase">Preference</div><div className="text-sm font-black">{stats.pref}</div></div></Card>
         <Card className="p-6"><div className="text-[10px] font-black text-[#636466] uppercase mb-3">Presence Ratio</div><div className="w-full bg-[#EEEEEE] rounded-full h-2.5 mb-2 overflow-hidden flex"><div className="bg-black h-2.5" style={{ width: `${stats.total ? (stats.inP/stats.total)*100 : 0}%` }}></div><div className="bg-[#ED1C24] h-2.5" style={{ width: `${stats.total ? (stats.rem/stats.total)*100 : 0}%` }}></div></div><div className="flex justify-between text-[10px] font-black uppercase text-[#9C9B9C]"><span>{stats.inP} In-person</span><span>{stats.rem} Remote</span></div></Card>
       </div>
-      <Card className="mt-6 overflow-hidden"><div className="p-5 border-b text-black font-black uppercase tracking-widest text-xs">Event History</div><table className="w-full text-left text-xs font-bold"><thead className="bg-[#F8F8F8] border-b"><tr><th className="py-3 px-5 text-[#9C9B9C] uppercase">Date</th><th className="py-3 px-5 text-[#9C9B9C] uppercase">Topic</th><th className="py-3 px-5 text-[#9C9B9C] uppercase">Host</th><th className="py-3 px-5 text-[#9C9B9C] uppercase">Mode</th></tr></thead><tbody className="divide-y">{history.map((row, i) => (<tr key={i} className="hover:bg-[#F8F8F8] transition-colors"><td className="py-3 px-5">{row.eventDate}</td><td className="py-3 px-5">{row.theme}</td><td className="py-3 px-5">{row.host}</td><td className="py-3 px-5"><span className={`px-2 py-1 rounded-sm text-[10px] font-black uppercase border ${row.attendanceType === 'In-person' ? 'border-black text-black' : 'border-[#ED1C24] text-[#ED1C24]'}`}>{row.attendanceType}</span></td></tr>))}</tbody></table></Card>
+      <Card className="mt-6 overflow-hidden"><div className="p-5 border-b text-black font-black uppercase tracking-widest text-xs">Event History</div><table className="w-full text-left text-xs font-bold"><thead className="bg-[#F8F8F8] border-b"><tr><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Date</th><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Theme</th><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Host</th><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Mode</th></tr></thead><tbody className="divide-y">{history.map((row, i) => (<tr key={`history-${i}`} className="hover:bg-[#F8F8F8] transition-colors"><td className="py-3 px-5">{row.eventDate}</td><td className="py-3 px-5">{row.theme}</td><td className="py-3 px-5">{row.host}</td><td className="py-3 px-5"><span className={`px-2 py-1 rounded-sm text-[10px] font-black uppercase border ${row.attendanceType === 'In-person' ? 'border-black text-black' : 'border-[#ED1C24] text-[#ED1C24]'}`}>{row.attendanceType}</span></td></tr>))}</tbody></table></Card>
     </div>
   );
 }
 
-function DataManagementPage({ aggData, setAggData, partData, setPartData, brand, fetchAllData, isConnecting, connectionError, webhookUrl, setWebhookUrl }) {
+function DataManagementPage({ aggData, partData, fetchAllData, isConnecting, connectionError, webhookUrl, setWebhookUrl }) {
   const [localData, setLocalData] = useState([...aggData]);
   const [localPartData, setLocalPartData] = useState([...partData]);
   const [activeTable, setActiveTable] = useState('events');
@@ -500,108 +390,115 @@ function DataManagementPage({ aggData, setAggData, partData, setPartData, brand,
     setLocalPartData([...partData]);
   }, [aggData, partData]);
 
-  const handleConnect = async () => {
-    if (fetchAllData) await fetchAllData();
-  };
-
   const handleSync = async () => {
     setIsSaving(true);
     try {
-      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery) : "[]" }));
+      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery.map(g => g.url || g)) : "[]" }));
       const agendasToSync = localData.map(e => ({ year: e.year, month: e.month, slots: [e.agenda?.[0] || {topic:"",speaker:"",artifact:""}, e.agenda?.[1] || {topic:"",speaker:"",artifact:""}, e.agenda?.[2] || {topic:"",speaker:"",artifact:""}] }));
-      await fetch(webhookUrl, { method: 'POST', body: JSON.stringify({ events: eventsToSync, participants: localPartData, agendas: agendasToSync }) });
-      setAggData(localData); setPartData(localPartData);
+      await fetch(webhookUrl, { method: 'POST', body: JSON.stringify({ action: 'syncData', events: eventsToSync, participants: localPartData, agendas: agendasToSync }) });
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
+      fetchAllData();
     } catch (e) { console.error(e); } finally { setIsSaving(false); }
   };
 
+  const eventHeaders = ['Year','Month','Att%','In-P','Rem','NPS','Insight','Log','Host','Theme'];
+  const partHeaders = ['Year','Month','NB ID','Full Name','Status'];
+
   return (
     <div className="space-y-6 h-full flex flex-col font-bold text-black">
-      <div className="flex justify-between items-end"><div><h1 className="text-2xl font-black">Data Synchronization</h1><p className="text-[#636466] font-medium">Manage master spreadsheets.</p></div><div className="flex gap-3 items-center">{saveSuccess && <span className="text-[#719F81] text-xs font-black uppercase flex items-center gap-1"><CheckCircle className="w-4 h-4"/> Synced</span>}<button onClick={handleSync} disabled={isSaving} className="bg-[#ED1C24] text-white px-5 py-2.5 rounded shadow-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:bg-[#811116] disabled:opacity-50"><Save className="w-4 h-4" />{isSaving ? 'Saving...' : 'Push Updates'}</button></div></div>
-      <Card className="p-4 border-l-4 border-l-[#719F81] flex flex-col md:flex-row gap-4 items-end"><div className="flex-1"><label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">API Webhook URL</label><input type="text" value={webhookUrl || ''} onChange={e => setWebhookUrl(e.target.value)} className="w-full border border-[#C7C8CA] rounded p-2 text-xs outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all" /></div><button onClick={handleConnect} disabled={isConnecting} className="bg-[#EEEEEE] text-black px-6 py-2.5 rounded text-xs font-black uppercase transition-all hover:bg-[#C7C8CA]">{isConnecting ? '...' : 'Fetch All Data'}</button></Card>
+      <div className="flex justify-between items-end"><div><h1 className="text-2xl font-black">Data Synchronization</h1><p className="text-[#636466] font-medium">Manage master spreadsheets.</p></div><div className="flex gap-3 items-center">{saveSuccess && <span className="text-[#719F81] text-xs font-black uppercase flex items-center gap-1"><CheckCircle size={16}/> Synced</span>}<button onClick={handleSync} disabled={isSaving} className="bg-[#ED1C24] text-white px-5 py-2.5 rounded shadow-sm text-xs font-black uppercase tracking-widest flex items-center gap-2 transition-all hover:bg-[#811116] disabled:opacity-50"><Save size={16} />{isSaving ? 'Saving...' : 'Push Updates'}</button></div></div>
+      <Card className="p-4 border-l-4 border-l-[#719F81] flex flex-col md:flex-row gap-4 items-end"><div className="flex-1"><label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">API Webhook URL</label><input type="text" value={webhookUrl || ''} onChange={e => setWebhookUrl(e.target.value)} className="w-full border border-[#C7C8CA] rounded p-2 text-xs outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all" /></div><button onClick={fetchAllData} disabled={isConnecting} className="bg-[#EEEEEE] text-black px-6 py-2.5 rounded text-xs font-black uppercase transition-all hover:bg-[#C7C8CA]">{isConnecting ? '...' : 'Fetch All Data'}</button></Card>
       {connectionError && <div className="bg-[#ED1C24] text-white p-3 rounded text-xs font-black uppercase">{connectionError}</div>}
       <div className="flex gap-2"><button onClick={() => setActiveTable('events')} className={`px-5 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all ${activeTable === 'events' ? 'bg-black text-white' : 'bg-[#EEEEEE] text-[#636466]'}`}>Events</button><button onClick={() => setActiveTable('participants')} className={`px-5 py-2 rounded text-[10px] font-black uppercase tracking-widest transition-all ${activeTable === 'participants' ? 'bg-black text-white' : 'bg-[#EEEEEE] text-[#636466]'}`}>Participants</button></div>
-      <Card className="flex-1 overflow-hidden flex flex-col border border-[#EEEEEE]"><div className="overflow-x-auto flex-1"><table className="w-full text-left border-collapse min-w-[800px] text-[10px]"><thead className="bg-[#F8F8F8] border-b sticky top-0 font-black text-[#9C9B9C] uppercase tracking-wider"><tr>{activeTable === 'events' ? ['Year','Month','Att%','In-P','Rem','NPS','Insight','Log','Host','Theme'].map(h => <th key={h} className="py-2 px-3 border-r">{h}</th>) : ['Year','Month','NB ID','Full Name','Status'].map(h => <th key={h} className="py-2 px-3 border-r">{h}</th>)}</tr></thead><tbody className="divide-y font-bold text-black">{activeTable === 'events' ? localData.map(r => (
-        <tr key={r.id} className="hover:bg-[#F8F8F8]">
-          <td className="p-1 border-r"><input value={r.year || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, year: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.month || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, month: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.attendance || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, attendance: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.inPerson || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, inPerson: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.remote || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, remote: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.nps || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, nps: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.insightful || ''} type="number" step="0.1" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, insightful: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.logistics || ''} type="number" step="0.1" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, logistics: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1 border-r"><input value={r.host || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, host: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-          <td className="p-1"><input value={r.theme || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, theme: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
-        </tr>
-      )) : localPartData.map(p => (<tr key={p.id} className="hover:bg-[#F8F8F8] text-black"><td className="p-1 border-r"><input value={p.year || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, year: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td><td className="p-1 border-r"><input value={p.month || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, month: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td><td className="p-1 border-r"><input value={p.nb || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, nb: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td><td className="p-1 border-r"><input value={p.participantName || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, participantName: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td><td className="p-1 border-r"><select value={p.attendanceType || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, attendanceType: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"><option value="">Absence</option><option value="In-person">In-person (X)</option><option value="Remote">Remote (R)</option></select></td></tr>))}</tbody></table></div></Card>
+      <Card className="flex-1 overflow-hidden flex flex-col border border-[#EEEEEE]">
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-left border-collapse min-w-[800px] text-[10px]">
+            <thead className="bg-[#F8F8F8] border-b sticky top-0 font-black text-[#9C9B9C] uppercase tracking-wider">
+              <tr>{(activeTable === 'events' ? eventHeaders : partHeaders).map((h, i) => <th key={`head-${h}-${i}`} className="py-2 px-3 border-r">{h}</th>)}</tr>
+            </thead>
+            <tbody className="divide-y font-bold text-black">
+              {activeTable === 'events' ? localData.map((r, i) => (
+                <tr key={`ev-row-${r.id || i}`} className="hover:bg-[#F8F8F8]">
+                  <td className="p-1 border-r"><input value={r.year || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, year: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.month || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, month: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.attendance || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, attendance: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.inPerson || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, inPerson: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.remote || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, remote: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.nps || ''} type="number" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, nps: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.insightful || ''} type="number" step="0.1" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, insightful: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.logistics || ''} type="number" step="0.1" onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, logistics: Number(e.target.value)} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={r.host || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, host: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1"><input value={r.theme || ''} onChange={e => setLocalData(d => d.map(x => x.id === r.id ? {...x, theme: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                </tr>
+              )) : localPartData.map((p, i) => (
+                <tr key={`part-row-${p.id || i}`} className="hover:bg-[#F8F8F8] text-black">
+                  <td className="p-1 border-r"><input value={p.year || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, year: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={p.month || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, month: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={p.nb || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, nb: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><input value={p.participantName || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, participantName: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"/></td>
+                  <td className="p-1 border-r"><select value={p.attendanceType || ''} onChange={e => setLocalPartData(d => d.map(x => x.id === p.id ? {...x, attendanceType: e.target.value} : x))} className="w-full bg-transparent border-none outline-none font-bold"><option value="">Absence</option><option value="In-person">In-person (X)</option><option value="Remote">Remote (R)</option></select></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
 
-function EventManagementPage({ aggData, setAggData, brand, callGemini }) {
+function EventManagementPage({ aggData, setAggData }) {
   const [selectedEventId, setSelectedEventId] = useState(aggData[aggData.length - 1]?.id || '');
   const selectedEvent = aggData.find(e => e.id === Number(selectedEventId)) || aggData[0] || {};
   const [newTopic, setNewTopic] = useState('');
   const [newSpeaker, setNewSpeaker] = useState('');
-  const [newArtifact, setNewArtifact] = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
 
   const handleAdd = () => { 
     if (newTopic && newSpeaker) {
-      setAggData(prev => prev.map(e => e.id === selectedEvent.id ? { ...e, agenda: [...(e.agenda || []), { topic: newTopic, speaker: newSpeaker, artifact: newArtifact }] } : e)); 
-      setNewTopic(''); 
-      setNewSpeaker(''); 
-      setNewArtifact('');
+      setAggData(prev => prev.map(e => e.id === selectedEvent.id ? { ...e, agenda: [...(e.agenda || []), { topic: newTopic, speaker: newSpeaker }] } : e)); 
+      setNewTopic(''); setNewSpeaker(''); 
     }
-  };
-  
-  const handleGen = async () => { 
-    setIsGenerating(true); 
-    const res = await callGemini(`JSON agenda for ${selectedEvent.theme}: [{"topic":"string","speaker":"string","artifact":""}]`); 
-    try { 
-      const cleaned = res.replace(/```json|```/g, '').trim();
-      const items = JSON.parse(cleaned); 
-      setAggData(prev => prev.map(e => e.id === selectedEvent.id ? {...e, agenda: [...(e.agenda || []), ...items]} : e)); 
-    } catch(e){ console.error(e); } finally { setIsGenerating(false); setAiPrompt(''); } 
   };
 
   return (
     <div className="space-y-6 text-sm font-bold animate-in fade-in duration-300">
-      <div className="flex justify-between items-end mb-8 text-black"><div><h1 className="text-2xl font-black">Strategic Content</h1><p className="text-[#636466] font-medium">Design event themes and content flows.</p></div><div className="w-80"><label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Select Event</label><select className="w-full border border-[#C7C8CA] rounded p-2.5 text-xs font-black outline-none bg-white text-[#ED1C24]" value={selectedEventId || ''} onChange={e => setSelectedEventId(e.target.value)}>{aggData.map(e => <option key={e.id} value={e.id}>{e.month} {e.year} - {e.theme || 'Untitled'}</option>)}</select></div></div>
+      <div className="flex justify-between items-end mb-8 text-black">
+        <div><h1 className="text-2xl font-black">Strategic Content</h1><p className="text-[#636466] font-medium">Design event themes and content flows.</p></div>
+        <div className="w-80">
+          <label className="block text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Select Event</label>
+          <select className="w-full border border-[#C7C8CA] rounded p-2.5 text-xs font-black outline-none bg-white text-[#ED1C24]" value={selectedEventId} onChange={e => setSelectedEventId(e.target.value)}>
+            {aggData.map(e => <option key={`opt-${e.id}`} value={e.id}>{e.month} {e.year} - {e.theme || 'Untitled'}</option>)}
+          </select>
+        </div>
+      </div>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-black">
-        <div className="space-y-6"><Card className="p-6"><h3 className="text-lg font-black mb-4 flex items-center gap-2"><Calendar className="w-5 h-5 text-[#ED1C24]" /> Identity</h3><div className="space-y-4"><div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Strategic Theme</label><input type="text" value={selectedEvent?.theme || ''} onChange={e => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, theme: e.target.value} : x))} className="w-full border rounded p-2.5 text-xs font-medium outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all"/></div><div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Master Host</label><input type="text" value={selectedEvent?.host || ''} onChange={e => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, host: e.target.value} : x))} className="w-full border rounded p-2.5 text-xs font-medium outline-none focus:ring-1 focus:ring-[#ED1C24] transition-all"/></div></div></Card></div>
+        <div className="space-y-6">
+          <Card className="p-6">
+            <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Calendar size={20} className="text-[#ED1C24]" /> Identity</h3>
+            <div className="space-y-4">
+              <div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Strategic Theme</label><input type="text" readOnly value={selectedEvent.theme || ''} className="w-full border rounded p-2.5 text-xs font-medium outline-none bg-[#F8F8F8]"/></div>
+              <div><label className="block text-[10px] font-black text-[#636466] uppercase mb-1">Master Host</label><input type="text" readOnly value={selectedEvent.host || ''} className="w-full border rounded p-2.5 text-xs font-medium outline-none bg-[#F8F8F8]"/></div>
+            </div>
+          </Card>
+        </div>
         <div className="lg:col-span-2 space-y-6">
           <Card className="p-6 text-black">
-            <h3 className="text-lg font-black mb-4 flex items-center gap-2"><Sparkles className="w-5 h-5 text-[#ED1C24]" /> AI Content Studio</h3>
-            <div className="flex gap-2 mb-6"><textarea className="flex-1 border rounded p-2.5 text-xs font-medium outline-none h-11 resize-none focus:ring-1 focus:ring-[#ED1C24]" placeholder="Focus area for AI agenda suggestions..." value={aiPrompt} onChange={e => setAiPrompt(e.target.value)}/><button onClick={handleGen} disabled={isGenerating || !aiPrompt} className="bg-black text-white px-5 rounded text-xs font-black uppercase tracking-widest disabled:opacity-50 transition-all">{isGenerating ? "..." : "Generate"}</button></div>
-            <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-black"><List className="w-5 h-5 text-[#ED1C24]" /> Live Agenda</h3>
-            <div className="space-y-3 mb-6">{(selectedEvent?.agenda || []).map((item, idx) => (
-              <div key={idx} className="flex items-center justify-between p-3 border rounded bg-[#F8F8F8] group hover:bg-white transition-all shadow-sm">
-                <div className="flex items-center gap-3">
-                  <Avatar name={item.speaker}/>
-                  <div className="text-xs font-bold">
-                    {item.topic}
-                    <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest leading-none mt-1">{item.speaker}</div>
+            <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-black"><List size={20} className="text-[#ED1C24]" /> Live Agenda</h3>
+            <div className="space-y-3 mb-6">
+              {(selectedEvent.agenda || []).map((item, idx) => (
+                <div key={`agenda-${idx}`} className="flex items-center justify-between p-3 border rounded bg-[#F8F8F8] group hover:bg-white transition-all shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <Avatar name={item.speaker}/>
+                    <div className="text-xs font-bold">{item.topic}<div className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">{item.speaker}</div></div>
                   </div>
+                  <button onClick={() => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, agenda: x.agenda.filter((_,i)=>i!==idx)} : x))} className="p-1.5 opacity-0 group-hover:opacity-100 text-[#ED1C24] hover:bg-red-50 rounded transition-all"><Trash2 size={16} /></button>
                 </div>
-                <div className="flex items-center gap-3">
-                  {item.artifact && <a href={item.artifact} target="_blank" rel="noreferrer" className="text-[10px] text-[#ED1C24] hover:underline font-black uppercase flex items-center gap-1"><ExternalLink className="w-3 h-3" /> Artifact</a>}
-                  <button onClick={() => setAggData(prev => prev.map(x => x.id === selectedEvent.id ? {...x, agenda: x.agenda.filter((_,i)=>i!==idx)} : x))} className="p-1.5 opacity-0 group-hover:opacity-100 text-[#ED1C24] hover:bg-red-50 rounded transition-all"><Trash2 className="w-4 h-4"/></button>
-                </div>
-              </div>
-            ))}</div>
+              ))}
+            </div>
             <div className="bg-[#F8F8F8] p-4 rounded border">
-              <div className="grid grid-cols-1 gap-3 mb-3 text-xs">
-                <div className="grid grid-cols-2 gap-3">
-                  <input placeholder="New Topic..." value={newTopic} onChange={e => setNewTopic(e.target.value)} className="border rounded p-2 outline-none"/>
-                  <input placeholder="Speaker..." value={newSpeaker} onChange={e => setNewSpeaker(e.target.value)} className="border rounded p-2 outline-none"/>
-                </div>
-                <input placeholder="Artifact URL (Optional)..." value={newArtifact} onChange={e => setNewArtifact(e.target.value)} className="border rounded p-2 outline-none w-full"/>
-              </div>
-              <button onClick={handleAdd} disabled={!newTopic || !newSpeaker} className="bg-[#ED1C24] text-white px-5 py-2.5 rounded text-xs font-black uppercase tracking-widest w-full transition-all active:scale-[0.98]">Add Topic</button>
+              <div className="grid grid-cols-2 gap-3 mb-3 text-xs"><input placeholder="New Topic..." value={newTopic} onChange={e => setNewTopic(e.target.value)} className="border rounded p-2 outline-none"/><input placeholder="Speaker..." value={newSpeaker} onChange={e => setNewSpeaker(e.target.value)} className="border rounded p-2 outline-none"/></div>
+              <button onClick={handleAdd} disabled={!newTopic || !newSpeaker} className="bg-[#ED1C24] text-white px-5 py-2.5 rounded text-xs font-black uppercase tracking-widest w-full transition-all">Add Topic</button>
             </div>
           </Card>
         </div>
@@ -610,69 +507,95 @@ function EventManagementPage({ aggData, setAggData, brand, callGemini }) {
   );
 }
 
+function DebugConsolePage({ logs, clearLogs }) {
+  return (
+    <div className="space-y-6 text-black">
+      <div className="flex justify-between items-center">
+        <div><h1 className="text-2xl font-black">Debug Console</h1><p className="text-[#636466] font-medium text-sm">Real-time application logs.</p></div>
+        <button onClick={clearLogs} className="text-xs font-black uppercase text-[#ED1C24] hover:underline">Clear Logs</button>
+      </div>
+      <Card className="bg-black text-[#00FF41] p-4 font-mono text-[11px] h-[500px] overflow-y-auto">
+        {logs.length === 0 ? <div className="text-neutral-600 opacity-50 flex items-center gap-2"><Terminal size={14}/> Listening for events...</div> : logs.map((log, i) => (
+          <div key={`log-${i}`} className="mb-1 border-b border-white/5 pb-1 last:border-0">
+            <span className="text-neutral-500 mr-2">[{log.time}]</span>
+            <span className={`${log.type === 'error' ? 'text-red-500' : log.type === 'success' ? 'text-green-400' : 'text-blue-300'}`}>{log.type.toUpperCase()}:</span> {log.msg}
+            {log.details && <div className="ml-14 text-neutral-400 italic">{log.details}</div>}
+          </div>
+        ))}
+      </Card>
+    </div>
+  );
+}
+
 // --- Main Application Component ---
 export default function App() {
   const [activeTab, setActiveTab] = useState('main');
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [aggData, setAggData] = useState([]);
   const [partData, setPartData] = useState([]); 
-
   const [expandedImage, setExpandedImage] = useState(null);
-  const [isAddingPhoto, setIsAddingPhoto] = useState(false);
-  const [newPhotoUrl, setNewPhotoUrl] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
   const [uploadStatus, setUploadStatus] = useState(null);
+  const [logs, setLogs] = useState([]);
+  
+  const [rosterSearch, setRosterSearch] = useState('');
+  const [rosterFilter, setRosterFilter] = useState('All');
 
-  const [webhookUrl, setWebhookUrl] = useState("[https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec](https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec)");
+  const [webhookUrl, setWebhookUrl] = useState("https://script.google.com/macros/s/AKfycbyurUBx5RLld5by5_DnUCruu1hnQDsxH3Hj1sB_O3LG6EgyCS96-pRF_Pxtl1wKjst4iQ/exec");
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState(null);
   const [isLoadingInitial, setIsLoadingInitial] = useState(true);
 
+  const addLog = (type, msg, details = null) => {
+    const time = new Date().toLocaleTimeString();
+    setLogs(prev => [{ time, type, msg, details }, ...prev].slice(0, 100));
+  };
+
   const fetchAllData = async () => {
     setIsConnecting(true); setConnectionError(null);
+    addLog('info', 'Starting main data fetch...');
     try {
       const response = await fetch(webhookUrl);
       const result = await response.json();
-      if (result.status !== 'success') throw new Error("Sync error.");
+      if (result.status !== 'success') throw new Error(result.message || "Sync error.");
+      
       const events = result.events.map((r, i) => {
-        const agendaMatch = (result.agendas || []).find(a => normalize(a.year) === normalize(r.year) && robustNormalizeMonth(a.month).toLowerCase() === robustNormalizeMonth(r.month).toLowerCase());
+        let attVal = safeParseFloat(r.attendance);
+        if (attVal !== null && attVal <= 1 && attVal > 0) attVal = Math.round(attVal * 100);
         
-        let att = safeParseFloat(r.attendance);
-        if (att !== null && att <= 1 && att > 0 && String(r.attendance).indexOf('%') === -1) {
-          att = Math.round(att * 100);
-        }
-
         let parsedGallery = [];
         try {
-           parsedGallery = JSON.parse(r.gallery || "[]");
+          const raw = JSON.parse(r.gallery || "[]");
+          parsedGallery = Array.isArray(raw) ? raw : [raw];
         } catch(e) {
-           parsedGallery = r.gallery ? [r.gallery] : [];
+          parsedGallery = r.gallery ? [r.gallery] : [];
         }
+        parsedGallery = parsedGallery.map(g => typeof g === 'object' ? g.url : g).filter(Boolean);
 
         return { 
-          id: i + 100, year: normalize(r.year), month: normalize(r.month), 
-          attendance: att, 
-          inPerson: safeParseInt(r.inPerson), 
+          id: i + 100, year: String(r.year || ''), month: String(r.month || ''), 
+          attendance: attVal, inPerson: safeParseInt(r.inPerson), 
           remote: safeParseInt(r.remote), nps: safeParseInt(r.nps), 
           insightful: safeParseFloat(r.insightful), logistics: safeParseFloat(r.logistics), 
-          host: normalize(r.host), theme: normalize(r.theme),
-          agenda: agendaMatch ? agendaMatch.slots.filter(s => s.topic || s.speaker) : [],
+          host: String(r.host || ''), theme: String(r.theme || ''),
+          agenda: (result.agendas || []).find(a => normalize(a.year) === normalize(r.year) && robustNormalizeMonth(a.month) === robustNormalizeMonth(r.month))?.slots || [],
           gallery: parsedGallery
         };
       });
-      const participants = result.participants.map((p, i) => ({ 
-        id: i + 1000, year: normalize(p.year), month: normalize(p.month), nb: normalize(p.nb), 
-        participantName: p.name, attendanceType: p.presence === 'X' ? 'In-person' : (p.presence === 'R' ? 'Remote' : '') 
+
+      const participants = (result.participants || []).map((p, i) => ({ 
+        id: i + 1000, year: String(p.year || ''), month: String(p.month || ''), nb: String(p.nb || ''), 
+        participantName: String(p.name || ''), attendanceType: p.presence === 'X' ? 'In-person' : (p.presence === 'R' ? 'Remote' : '') 
       }));
+
       setAggData(events); setPartData(participants);
-    } catch (err) { setConnectionError(err.message); } finally { setIsConnecting(false); setIsLoadingInitial(false); }
+      addLog('success', `Fetched ${events.length} events and ${participants.length} roster entries.`);
+    } catch (err) { 
+      setConnectionError(err.message); addLog('error', 'Main fetch failed', err.toString());
+    } finally { setIsConnecting(false); setIsLoadingInitial(false); }
   };
 
-  useEffect(() => {
-    fetchAllData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { fetchAllData(); }, []);
 
   const completedEvents = useMemo(() => {
     return [...aggData].filter(e => e.attendance !== null).sort((a, b) => {
@@ -681,12 +604,8 @@ export default function App() {
     });
   }, [aggData]);
 
-  const latestEventId = useMemo(() => {
-    return completedEvents.length > 0 ? completedEvents[completedEvents.length - 1].id : '';
-  }, [completedEvents]);
-
+  const latestEventId = useMemo(() => completedEvents.length > 0 ? completedEvents[completedEvents.length - 1].id : '', [completedEvents]);
   const [selectedHomeEventId, setSelectedHomeEventId] = useState('');
-
   const currentHomeEvent = useMemo(() => {
     const idToFind = selectedHomeEventId === '' ? latestEventId : Number(selectedHomeEventId);
     return completedEvents.find(e => e.id === idToFind) || completedEvents[completedEvents.length - 1];
@@ -698,97 +617,71 @@ export default function App() {
     return idx > 0 ? completedEvents[idx - 1] : null;
   }, [completedEvents, currentHomeEvent]);
 
-  const [rosterFilter, setRosterFilter] = useState('All');
-  const [rosterSearch, setRosterSearch] = useState('');
+  const filteredPhotos = useMemo(() => {
+    return (currentHomeEvent?.gallery || []).map((url, idx) => ({ url, name: `Photo ${idx + 1}` }));
+  }, [currentHomeEvent]);
 
   const eventParticipants = useMemo(() => {
-    if (!currentHomeEvent) return [];
+    if (!currentHomeEvent || !partData) return [];
     const targetY = normalize(currentHomeEvent.year);
     const targetM = robustNormalizeMonth(currentHomeEvent.month).toLowerCase();
-    
-    return partData.filter(p => 
-      normalize(p.year) === targetY && 
-      robustNormalizeMonth(p.month).toLowerCase() === targetM
-    ).sort((a, b) => a.participantName.localeCompare(b.participantName));
+    return partData.filter(p => normalize(p.year) === targetY && robustNormalizeMonth(p.month).toLowerCase() === targetM);
   }, [partData, currentHomeEvent]);
-  
+
   const filteredParticipants = useMemo(() => {
-    let list = eventParticipants;
+    let list = [...eventParticipants];
+
     if (rosterFilter === 'In-person') list = list.filter(p => p.attendanceType === 'In-person');
     else if (rosterFilter === 'Remote') list = list.filter(p => p.attendanceType === 'Remote');
     else if (rosterFilter === 'Absent') list = list.filter(p => !p.attendanceType);
-    if (rosterSearch.trim()) list = list.filter(p => p.participantName.toLowerCase().includes(rosterSearch.toLowerCase()));
-    return list;
-  }, [eventParticipants, rosterFilter, rosterSearch]);
 
-  const totalAttendees = useMemo(() => eventParticipants.filter(p => p.attendanceType).length, [eventParticipants]);
-  const absencesCount = eventParticipants.length - totalAttendees;
+    if (rosterSearch.trim()) {
+      list = list.filter(p => (p.participantName || "").toLowerCase().includes(rosterSearch.toLowerCase()));
+    }
 
-  const [executiveSummary, setExecutiveSummary] = useState('');
+    return list.sort((a, b) => (a.participantName || "").localeCompare(b.participantName || ""));
+  }, [eventParticipants, rosterSearch, rosterFilter]);
+
+  const eventTotalPresent = useMemo(() => eventParticipants.filter(p => p.attendanceType).length, [eventParticipants]);
+  const eventTotalAbsent = Math.max(0, eventParticipants.length - (currentHomeEvent?.inPerson || 0) - (currentHomeEvent?.remote || 0));
+
+  const [execSummary, setExecSummary] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
-
   const handleGenerateSummary = async () => {
     if (!currentHomeEvent) return;
     setIsSummarizing(true);
     try {
-      const prompt = `Analyze this event dashboard and generate concise, objective insights. Focus on 5 areas: attendance, NPS, insightful score, logistics score, and participant split. Identify the main positive trends, the main risks, and the most important action items. Compare current values against previous values shown on the dashboard. Keep the output short, factual, and business-oriented. Avoid repetition, speculation, and generic advice.
-
-Format the output EXACTLY using these 4 headings (do not use any markdown bolding like ** or headers like ###, only the raw text text):
-Summary
-- [bullet point]
-Strengths
-- [bullet point]
-Risks
-- [bullet point]
-Actions
-- [bullet point]
-
-Data for current event ("${currentHomeEvent.theme}"):
-- Attendance: ${currentHomeEvent.attendance}% (Previous: ${prevHomeEvent?.attendance || 'N/A'}%)
-- NPS: ${currentHomeEvent.nps} (Previous: ${prevHomeEvent?.nps || 'N/A'})
-- Insightful Score: ${currentHomeEvent.insightful}/5 (Previous: ${prevHomeEvent?.insightful || 'N/A'})
-- Logistics Score: ${currentHomeEvent.logistics}/5 (Previous: ${prevHomeEvent?.logistics || 'N/A'})
-- Participant Split: ${currentHomeEvent.inPerson || 0} In-person, ${currentHomeEvent.remote || 0} Remote, ${absencesCount} Absent`;
-
-      const summary = await callGemini(prompt);
-      setExecutiveSummary(summary);
-    } catch (e) { setExecutiveSummary("Error generating summary."); } finally { setIsSummarizing(false); }
+      const res = await callGemini(`Summary for ${currentHomeEvent.theme}. NPS ${currentHomeEvent.nps}, Att ${currentHomeEvent.attendance}%`);
+      setExecSummary(res);
+      addLog('info', 'AI Summary generated.');
+    } catch (e) { setExecSummary("Error generating summary."); } finally { setIsSummarizing(false); }
   };
 
   const handleFileUpload = async (file) => {
     if (!file) return;
+    addLog('info', `Starting upload: ${file.name}`);
+    const validExts = ['.heic', '.heif', '.jpg', '.jpeg', '.png'];
+    const fileName = file.name.toLowerCase();
+    if (!validExts.some(ext => fileName.endsWith(ext))) {
+      addLog('error', 'Invalid format blocked'); setUploadStatus("Invalid Format"); return;
+    }
     setUploadStatus("Uploading...");
     const reader = new FileReader();
     reader.onload = async (e) => {
       const base64 = e.target.result.split(',')[1];
+      const targetName = `${currentHomeEvent.year}_${currentHomeEvent.month}_${file.name.replace(/\s+/g, '_')}`;
       try {
         const response = await fetch(webhookUrl, {
           method: 'POST',
-          body: JSON.stringify({
-            action: 'uploadImage',
-            year: currentHomeEvent.year,
-            month: currentHomeEvent.month,
-            fileName: file.name,
-            mimeType: file.type,
-            fileData: base64
-          })
+          body: JSON.stringify({ action: 'uploadImage', year: currentHomeEvent.year, month: currentHomeEvent.month, fileName: targetName, mimeType: file.type || 'image/jpeg', fileData: base64 })
         });
         const result = await response.json();
         if (result.status === 'success') {
-          setUploadStatus("Success!");
-          // Update local state immediately
-          const newUrl = result.url;
-          setAggData(prev => prev.map(ev => 
-            ev.id === currentHomeEvent.id 
-              ? { ...ev, gallery: [...(ev.gallery || []), newUrl] }
-              : ev
-          ));
-        } else {
-          setUploadStatus("Error.");
-        }
-      } catch (err) {
-        setUploadStatus("Error.");
-      }
+          addLog('success', 'Uploaded successfully.', `URL: ${result.url}`);
+          setUploadStatus("Success!"); 
+          fetchAllData(); // Refresh to fetch newly appended gallery URL from DB
+        } else { addLog('error', 'Upload failed', result.message); setUploadStatus("Error."); }
+      } catch (err) { addLog('error', 'Network upload error', err.toString()); setUploadStatus("Error."); }
       setTimeout(() => setUploadStatus(null), 3000);
     };
     reader.readAsDataURL(file);
@@ -798,213 +691,190 @@ Data for current event ("${currentHomeEvent.theme}"):
     { id: 'main', label: 'Overview', icon: LayoutDashboard },
     { id: 'insights', label: 'Insights & Planning', icon: TrendingUp },
     { id: 'participant', label: 'Engagement Tracker', icon: Users },
-    { id: 'settings', label: 'Settings', icon: Settings, subItems: [ { id: 'events', label: 'Event Details', icon: List }, { id: 'data', label: 'Data Management', icon: Database } ] }
+    { id: 'settings', label: 'Settings', icon: Settings, subItems: [ 
+        { id: 'events', label: 'Event Details', icon: List }, 
+        { id: 'data', label: 'Data Management', icon: Database },
+        { id: 'debug', label: 'Debug Console', icon: Bug }
+      ] 
+    }
   ];
 
-  const handleDownload = (url) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'event-photo.jpg');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-  };
-
   return (
-    <div className="flex h-screen w-full" style={{ backgroundColor: BRAND.colors.bg, color: BRAND.colors.text, fontFamily: BRAND.font }}>
-      <div className="w-64 bg-white border-r border-[#EEEEEE] flex flex-col shadow-sm z-10 shrink-0">
-        <div className="p-6 border-b border-[#EEEEEE] flex items-center justify-center font-black text-2xl tracking-tighter text-black">CEL<span className="font-light">FOCUS</span></div>
-        <div className="p-4 flex-1 overflow-y-auto">
-          {navItems.map(item => {
-            const Icon = item.icon;
-            if (item.subItems) {
-              return (
-                <div key={item.id} className="mb-2">
-                  <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="w-full flex items-center justify-between px-4 py-3 text-[#636466] hover:bg-[#F8F8F8] font-medium rounded transition-all">
-                    <div className="flex items-center gap-3"><Icon className="w-5 h-5 text-[#9C9B9C]" />{item.label}</div>
-                    {isSettingsOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  {isSettingsOpen && (
-                    <div className="mt-1 space-y-1">
-                      {item.subItems.map(sub => {
-                        const SubIcon = sub.icon;
-                        return (
-                          <button key={sub.id} onClick={() => setActiveTab(sub.id)} className={`w-full flex items-center gap-3 pl-12 pr-4 py-2.5 text-sm ${activeTab === sub.id ? 'bg-[#F8F8F8] text-[#ED1C24] font-bold border-r-4 border-[#ED1C24]' : 'text-[#636466] hover:bg-[#F8F8F8] font-medium'}`}>
-                            <SubIcon className={`w-4 h-4 ${activeTab === sub.id ? 'text-[#ED1C24]' : 'text-[#9C9B9C]'}`} />{sub.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            }
+    <div className="flex h-screen w-full bg-[#F8F8F8] font-sans" style={{ fontFamily: BRAND.font }}>
+      <div className={`bg-white border-r border-[#EEEEEE] flex flex-col shrink-0 z-10 shadow-sm transition-all duration-300 ${isSidebarExpanded ? 'w-64' : 'w-20'}`}>
+        <div className={`p-6 border-b flex items-center ${isSidebarExpanded ? 'justify-between' : 'justify-center'}`}>
+          {isSidebarExpanded && <div className="font-black text-2xl tracking-tighter text-black">CEL<span className="font-light">FOCUS</span></div>}
+          <button onClick={() => setIsSidebarExpanded(!isSidebarExpanded)} className="text-[#9C9B9C] hover:text-black transition-colors shrink-0">
+            <Menu size={24} />
+          </button>
+        </div>
+        <div className="p-4 flex-1 overflow-y-auto space-y-1 overflow-x-hidden">
+          {navItems.map((item, itemIdx) => {
+            const IconComponent = item.icon;
+            if (item.subItems) return (
+              <div key={`nav-${item.id}-${itemIdx}`}>
+                <button onClick={() => {
+                  if (!isSidebarExpanded) { setIsSidebarExpanded(true); setIsSettingsOpen(true); } 
+                  else { setIsSettingsOpen(!isSettingsOpen); }
+                }} className={`w-full flex items-center ${isSidebarExpanded ? 'justify-between px-4' : 'justify-center px-0'} py-3 text-[#636466] hover:bg-[#F8F8F8] font-medium rounded transition-all`}>
+                  <div className="flex items-center gap-3">
+                    <IconComponent size={20} className="text-[#9C9B9C] shrink-0" />
+                    {isSidebarExpanded && <span className="whitespace-nowrap">{item.label}</span>}
+                  </div>
+                  {isSidebarExpanded && (isSettingsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                </button>
+                {isSidebarExpanded && isSettingsOpen && item.subItems.map((sub, subIdx) => {
+                   const SubIcon = sub.icon;
+                   return (
+                     <button key={`subnav-${sub.id}-${subIdx}`} onClick={() => setActiveTab(sub.id)} className={`w-full flex items-center gap-3 pl-12 pr-4 py-2.5 text-sm ${activeTab === sub.id ? 'bg-[#F8F8F8] text-[#ED1C24] font-bold border-r-4 border-[#ED1C24]' : 'text-[#636466] hover:bg-[#F8F8F8]'}`}>
+                       <SubIcon size={16} className="shrink-0"/>
+                       <span className="whitespace-nowrap">{sub.label}</span>
+                     </button>
+                   );
+                })}
+              </div>
+            );
             return (
-              <button key={item.id} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center gap-3 px-4 py-3 mb-2 transition-all ${activeTab === item.id ? 'bg-[#F8F8F8] text-[#ED1C24] font-bold border-r-4 border-[#ED1C24]' : 'text-[#636466] hover:bg-[#F8F8F8] font-medium'}`}>
-                <Icon className={`w-5 h-5 ${activeTab === item.id ? 'text-[#ED1C24]' : 'text-[#9C9B9C]'}`} />{item.label}
+              <button key={`nav-${item.id}-${itemIdx}`} onClick={() => setActiveTab(item.id)} className={`w-full flex items-center ${isSidebarExpanded ? 'px-4' : 'justify-center px-0'} gap-3 py-3 rounded transition-all ${activeTab === item.id ? 'bg-[#F8F8F8] text-[#ED1C24] font-bold border-r-4 border-[#ED1C24]' : 'text-[#636466] hover:bg-[#F8F8F8]'}`}>
+                <IconComponent size={20} className="shrink-0" />
+                {isSidebarExpanded && <span className="whitespace-nowrap">{item.label}</span>}
               </button>
             );
           })}
         </div>
       </div>
-
       <div className="flex-1 overflow-auto p-8 max-w-7xl mx-auto">
-        {isLoadingInitial && aggData.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-[#9C9B9C] space-y-4">
-            <div className="w-8 h-8 border-4 border-[#ED1C24] border-t-transparent rounded-full animate-spin"></div>
-            <p className="font-bold tracking-widest uppercase text-xs">Loading Live Data...</p>
-          </div>
-        ) : (
+        {isLoadingInitial && aggData.length === 0 ? <div className="h-full flex items-center justify-center font-black uppercase tracking-widest text-[#9C9B9C] animate-pulse">Loading Live Data...</div> : (
           <>
-            {activeTab === 'main' && !currentHomeEvent && (
-              <div className="h-full flex flex-col items-center justify-center text-[#9C9B9C] space-y-4">
-                <Database className="w-12 h-12 text-[#EEEEEE]" />
-                <p className="font-bold tracking-widest uppercase text-xs">No Events Found. Please Sync Data.</p>
-              </div>
-            )}
-            
             {activeTab === 'main' && currentHomeEvent && (
               <div className="space-y-6">
                 <div className="flex justify-between items-start gap-4 text-black">
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <h1 className="text-2xl font-black">Event Analysis</h1>
-                      <select 
-                        value={selectedHomeEventId === '' ? latestEventId : selectedHomeEventId} 
-                        onChange={e => setSelectedHomeEventId(e.target.value)} 
-                        className="border border-[#C7C8CA] rounded px-3 py-1 text-sm font-bold bg-white text-[#ED1C24] outline-none"
-                      >
-                        {completedEvents.map(e => <option key={e.id} value={e.id}>{e.month} {e.year}</option>)}
-                      </select>
-                    </div>
-                    <h2 className="text-lg font-bold text-[#636466] mb-1">{currentHomeEvent.theme}</h2>
-                    <p className="text-xs text-[#9C9B9C] font-black uppercase tracking-widest flex items-center gap-2"><Users className="w-3.5 h-3.5 text-[#ED1C24]"/> Hosted by {currentHomeEvent.host}</p>
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-black">Event Analysis</h1>
+                    <select value={selectedHomeEventId} onChange={e => setSelectedHomeEventId(e.target.value)} className="border rounded px-3 py-1 text-sm font-bold bg-white text-[#ED1C24] outline-none">{completedEvents.map(e => <option key={`opt-ev-${e.id}`} value={e.id}>{e.month} {e.year}</option>)}</select>
                   </div>
-                  <button onClick={handleGenerateSummary} disabled={isSummarizing} className="bg-black hover:bg-[#333333] text-white px-5 py-2.5 rounded shadow-sm flex items-center gap-2 text-sm font-bold disabled:opacity-50 transition-all">
-                    <Sparkles className="w-4 h-4" />{isSummarizing ? "Drafting..." : "✨ AI Summary"}
-                  </button>
+                  <button onClick={handleGenerateSummary} disabled={isSummarizing} className="bg-black text-white px-5 py-2.5 rounded shadow-sm flex items-center gap-2 text-sm font-bold hover:bg-neutral-800 transition-all"><Sparkles size={16}/> AI Summary</button>
                 </div>
-
-                {executiveSummary && (
-                  <Card className="p-6 border-l-4 border-l-[#ED1C24] bg-white animate-in fade-in duration-500 relative">
-                    <button onClick={() => setExecutiveSummary('')} className="absolute top-4 right-4 text-[#9C9B9C] hover:text-[#000000] transition-colors"><X className="w-5 h-5"/></button>
-                    <h3 className="text-xs font-black text-[#9C9B9C] uppercase tracking-widest mb-1 flex items-center gap-2 text-black"><FileText className="w-4 h-4 text-black"/> AI Executive Summary</h3>
-                    <CleanAISummary text={executiveSummary} />
-                  </Card>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-black">
-                  <Card className="p-5 border-l-4 border-l-[#ED1C24]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Attendance</div><div className="text-3xl font-black mb-2">{currentHomeEvent.attendance}%</div><DeltaIndicator current={currentHomeEvent.attendance} previous={prevHomeEvent?.attendance}/></Card>
-                  <Card className="p-5 border-l-4 border-l-black"><div className="text-xs font-black text-[#9C9B9C] uppercase">NPS Score</div><div className="text-3xl font-black mb-2">{currentHomeEvent.nps}</div><DeltaIndicator current={currentHomeEvent.nps} previous={prevHomeEvent?.nps}/></Card>
-                  <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl font-black mb-2">{currentHomeEvent.insightful}</div><DeltaIndicator current={currentHomeEvent.insightful} previous={prevHomeEvent?.insightful}/></Card>
-                  <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-xs font-black text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl font-black mb-2">{currentHomeEvent.logistics}</div><DeltaIndicator current={currentHomeEvent.logistics} previous={prevHomeEvent?.logistics}/></Card>
+                {execSummary && <Card className="p-6 border-l-4 border-l-[#ED1C24] relative animate-in slide-in-from-top"><button onClick={() => setExecSummary('')} className="absolute top-4 right-4 text-[#9C9B9C]"><X size={20}/></button><CleanAISummary text={execSummary} /></Card>}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-black font-black">
+                  <Card className="p-5 border-l-4 border-l-[#ED1C24]"><div className="text-[10px] text-[#9C9B9C] uppercase">Attendance</div><div className="text-3xl mt-1">{currentHomeEvent.attendance}%</div><DeltaIndicator current={currentHomeEvent.attendance} previous={prevHomeEvent?.attendance}/></Card>
+                  <Card className="p-5 border-l-4 border-l-black"><div className="text-[10px] text-[#9C9B9C] uppercase">NPS Score</div><div className="text-3xl mt-1">{currentHomeEvent.nps}</div><DeltaIndicator current={currentHomeEvent.nps} previous={prevHomeEvent?.nps}/></Card>
+                  <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-[10px] text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl mt-1">{currentHomeEvent.insightful}</div></Card>
+                  <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-[10px] text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl mt-1">{currentHomeEvent.logistics}</div></Card>
                 </div>
-
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-6 text-black">
-                    <h3 className="text-lg font-black flex items-center gap-2">
-                      <ImageIcon className="w-5 h-5 text-[#ED1C24]" /> 
-                      Event Gallery
-                    </h3>
-                    {uploadStatus && <span className="text-[10px] font-black uppercase text-[#ED1C24] animate-pulse">{uploadStatus}</span>}
+                    <h3 className="text-lg font-black flex items-center gap-2"><ImageIcon size={20} className="text-[#ED1C24]" /> Event Gallery</h3>
+                    <div className="flex items-center gap-4">{uploadStatus && <span className="text-[10px] font-black uppercase text-[#ED1C24] animate-pulse">{uploadStatus}</span>}</div>
                   </div>
-                  
                   <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar scroll-smooth">
-                    {/* Upload Card */}
-                    <label 
-                      className={`flex-shrink-0 w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all ${isDragging ? 'border-[#ED1C24] bg-red-50' : 'border-[#EEEEEE] hover:border-[#ED1C24]'}`}
-                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                      onDragLeave={() => setIsDragging(false)}
-                      onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFileUpload(e.dataTransfer.files[0]); }}
-                    >
-                      <Plus className="w-6 h-6 text-[#9C9B9C]" />
-                      <span className="text-[10px] font-black text-[#9C9B9C] uppercase mt-1 text-center px-4">Drag photo or upload</span>
-                      <input type="file" className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e.target.files[0])} />
+                    <label className={`flex-shrink-0 w-48 h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer border-[#EEEEEE] hover:border-[#ED1C24] hover:bg-red-50`} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); handleFileUpload(e.dataTransfer.files[0]); }}>
+                      <Plus size={24} className="text-[#9C9B9C]" /><span className="text-[10px] font-black text-[#9C9B9C] uppercase mt-1 text-center">Upload HEIC/JPG/PNG</span>
+                      <input type="file" className="hidden" accept=".heic, .heif, .jpg, .jpeg, .png" onChange={(e) => handleFileUpload(e.target.files[0])} />
                     </label>
-
-                    {(currentHomeEvent.gallery || []).map((url, idx) => (
-                      <div key={idx} className="flex-shrink-0 w-48 h-32 relative group rounded-lg overflow-hidden border border-[#EEEEEE] bg-gray-50 shadow-sm">
-                        <img src={url} alt={`Gallery ${idx}`} className="w-full h-full object-cover" />
+                    {filteredPhotos.map((img, idx) => (
+                      <div key={`photo-${idx}`} className="flex-shrink-0 w-48 h-32 relative group rounded-lg overflow-hidden border bg-gray-50 shadow-sm transition-transform hover:scale-[1.02]">
+                        <img src={img.url} alt={img.name} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                          <button onClick={() => setExpandedImage(url)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all transform hover:scale-110">
-                            <MousePointer2 className="w-4 h-4" />
-                          </button>
-                          <button onClick={() => handleDownload(url)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all transform hover:scale-110">
-                            <Download className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => setExpandedImage(img.url)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all"><MousePointer2 size={16} /></button>
+                          <a href={img.url} target="_blank" rel="noreferrer" className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all"><Download size={16} /></a>
                         </div>
                       </div>
                     ))}
-                    
-                    {(!currentHomeEvent.gallery || currentHomeEvent.gallery.length === 0) && (
+                    {filteredPhotos.length === 0 && (
                       <div className="flex-1 min-w-[200px] flex items-center text-[#9C9B9C] text-xs italic">
-                        No photos captured for this event yet.
+                        No photos added to this session yet.
                       </div>
                     )}
                   </div>
                 </Card>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 text-black">
                   <div className="lg:col-span-2 space-y-6">
-                    <Card className="p-6">
-                      <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-black"><Clock className="w-5 h-5 text-[#ED1C24]" /> Event Agenda</h3>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {(currentHomeEvent.agenda || []).map((item, idx) => (
-                          <div key={idx} className="p-4 border border-[#EEEEEE] rounded bg-[#F8F8F8] flex items-center gap-3">
-                            <Avatar name={item.speaker} />
-                            <div><h4 className="font-bold text-sm text-black">{item.topic}</h4><p className="text-[10px] font-black text-[#636466] uppercase">{item.speaker}</p></div>
-                          </div>
-                        ))}
-                        {(!currentHomeEvent.agenda || currentHomeEvent.agenda.length === 0) && (
-                          <div className="col-span-2 text-center py-8 text-[#9C9B9C] font-bold uppercase tracking-widest border-2 border-dashed border-[#EEEEEE] rounded">No agenda items added</div>
-                        )}
-                      </div>
-                    </Card>
+                    <Card className="p-6 min-h-[300px]"><h3 className="text-lg font-black mb-4 flex items-center gap-2"><Clock size={20} className="text-[#ED1C24]" /> Event Agenda</h3><ul className="space-y-2">{(currentHomeEvent.agenda || []).map((a, i) => (<li key={`agenda-${i}`} className="p-3 bg-[#F8F8F8] border rounded-sm text-xs font-black">{a.topic}<div className="text-[10px] text-[#9C9B9C] uppercase mt-1 font-bold">{a.speaker}</div></li>))}</ul></Card>
                     <Card className="flex flex-col">
                       <div className="p-5 border-b border-[#EEEEEE] flex flex-col xl:flex-row justify-between xl:items-center gap-4 text-black">
-                        <div>
+                        <div className="shrink-0">
                           <h3 className="text-lg font-black">Attendee Roster</h3>
-                          <p className="text-[10px] font-black text-[#9C9B9C] uppercase tracking-wider">{totalAttendees} Present / {eventParticipants.length} Invited</p>
+                          <p className="text-[10px] font-black text-[#9C9B9C] uppercase tracking-wider">{eventTotalPresent} Present / {eventParticipants.length} Invited</p>
                         </div>
                         <div className="flex flex-wrap items-center gap-3">
-                          <div className="relative"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#9C9B9C]" /><input type="text" placeholder="Search..." className="pl-9 pr-4 py-2 border border-[#C7C8CA] rounded text-xs outline-none focus:border-[#ED1C24] transition-all" value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} /></div>
-                          <div className="flex bg-[#F8F8F8] p-1 rounded border shrink-0">
-                            {['All', 'In-person', 'Remote', 'Absent'].map(tab => <button key={tab} onClick={() => setRosterFilter(tab)} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded transition-all ${rosterFilter === tab ? 'bg-white text-[#ED1C24] shadow-sm' : 'text-[#636466]'}`}>{tab}</button>)}
+                          <div className="relative grow sm:grow-0">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#9C9B9C]" size={14} />
+                            <input type="text" placeholder="Search..." className="w-full pl-9 pr-4 py-2 border border-[#C7C8CA] rounded text-xs outline-none focus:border-[#ED1C24] transition-all" value={rosterSearch} onChange={e => setRosterSearch(e.target.value)} />
+                          </div>
+                          <div className="flex bg-[#F8F8F8] p-1 rounded border shrink-0 overflow-x-auto">
+                            {['All', 'In-person', 'Remote', 'Absent'].map(tab => (
+                              <button key={`filter-${tab}`} onClick={() => setRosterFilter(tab)} className={`px-3 py-1.5 text-[10px] font-black uppercase rounded transition-all whitespace-nowrap ${rosterFilter === tab ? 'bg-white text-[#ED1C24] shadow-sm' : 'text-[#636466]'}`}>{tab}</button>
+                            ))}
                           </div>
                         </div>
                       </div>
                       <div className="max-h-[400px] overflow-y-auto">
-                        <table className="w-full text-left text-xs font-bold"><thead className="bg-[#F8F8F8] sticky top-0 border-b"><tr><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Participant</th><th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Status</th></tr></thead><tbody className="divide-y">
-                          {filteredParticipants.map((p, i) => (<tr key={p.id || i} className="hover:bg-[#F8F8F8] transition-colors text-black"><td className="py-3 px-5">{p.participantName}</td><td className="py-3 px-5"><span className={`inline-flex px-2 py-1 rounded-sm text-[10px] font-black uppercase ${p.attendanceType === 'In-person' ? 'bg-[#EEEEEE] text-black' : p.attendanceType === 'Remote' ? 'bg-[#FF4F50]/10 text-[#ED1C24]' : 'bg-gray-100 text-[#9C9B9C] opacity-60'}`}>{p.attendanceType || 'Absent'}</span></td></tr>))}
-                        </tbody></table>
+                        <table className="w-full text-left text-xs font-bold">
+                          <thead className="bg-[#F8F8F8] sticky top-0 border-b">
+                            <tr><th className="py-3 px-5 text-[#9C9B9C] uppercase">Participant</th><th className="py-3 px-5 text-[#9C9B9C] uppercase">Status</th></tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {filteredParticipants.map((p, i) => (
+                              <tr key={`app-part-${p.id || i}`} className="hover:bg-[#F8F8F8]">
+                                <td className="py-3 px-5">{p.participantName}</td>
+                                <td className="py-3 px-5"><span className={`inline-flex px-2 py-1 rounded-sm text-[10px] font-black uppercase ${p.attendanceType === 'In-person' ? 'bg-[#EEEEEE] text-black' : p.attendanceType === 'Remote' ? 'bg-[#FF4F50]/10 text-[#ED1C24]' : 'bg-gray-100 text-[#9C9B9C] opacity-60'}`}>{p.attendanceType || 'Absent'}</span></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </Card>
                   </div>
-                  <div className="space-y-6">
-                    <Card className="p-6">
-                      <h3 className="text-lg font-black mb-4 text-black">Participant Split</h3>
-                      <div className="h-64 relative">
-                        <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={[{ name: 'In-person', value: currentHomeEvent.inPerson || 0 }, { name: 'Remote', value: currentHomeEvent.remote || 0 }, { name: 'Absent', value: absencesCount || 0 }]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value"><Cell fill={BRAND.colors.secondary} /><Cell fill={BRAND.colors.primary} /><Cell fill="#C7C8CA" /></Pie><RechartsTooltip/></PieChart></ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4 text-black"><span className="text-3xl font-black">{eventParticipants.length}</span><span className="text-[10px] font-bold text-[#9C9B9C] uppercase">Invited</span></div>
+                  <Card className="p-6">
+                    <h3 className="text-lg font-black mb-4 text-black">Participant Split</h3>
+                    <div className="h-64 relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={[
+                            { name: 'In-person', value: currentHomeEvent.inPerson || 0 }, 
+                            { name: 'Remote', value: currentHomeEvent.remote || 0 }, 
+                            { name: 'Absent', value: eventTotalAbsent }
+                          ]} cx="50%" cy="50%" innerRadius={60} outerRadius={80} dataKey="value">
+                            <Cell fill={BRAND.colors.secondary} />
+                            <Cell fill={BRAND.colors.primary} />
+                            <Cell fill="#C7C8CA" />
+                          </Pie>
+                          <RechartsTooltip/>
+                        </PieChart>
+                      </ResponsiveContainer>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4 text-black">
+                        <span className="text-3xl font-black">{eventParticipants.length}</span>
+                        <span className="text-[10px] font-bold text-[#9C9B9C] uppercase">Invited</span>
                       </div>
-                    </Card>
-                  </div>
+                    </div>
+                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-6 pt-4 border-t border-[#EEEEEE]">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-black whitespace-nowrap">
+                        <div className="w-3 h-3 rounded-sm bg-black shrink-0"></div> <span>{currentHomeEvent.inPerson || 0}</span> In-person
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-black whitespace-nowrap">
+                        <div className="w-3 h-3 rounded-sm bg-[#ED1C24] shrink-0"></div> <span>{currentHomeEvent.remote || 0}</span> Remote
+                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#9C9B9C] whitespace-nowrap">
+                        <div className="w-3 h-3 rounded-sm bg-[#C7C8CA] shrink-0"></div> <span>{eventTotalAbsent}</span> Absent
+                      </div>
+                    </div>
+                  </Card>
                 </div>
               </div>
             )}
-
             {activeTab === 'insights' && <InsightsPage completedEvents={completedEvents} brand={BRAND} callGemini={callGemini} />}
             {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} brand={BRAND} callGemini={callGemini} />}
-            {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} brand={BRAND} callGemini={callGemini} />}
-            {activeTab === 'data' && <DataManagementPage aggData={aggData} setAggData={setAggData} partData={partData} setPartData={setPartData} brand={BRAND} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
+            {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} />}
+            {activeTab === 'data' && <DataManagementPage aggData={aggData} partData={partData} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
+            {activeTab === 'debug' && <DebugConsolePage logs={logs} clearLogs={() => setLogs([])} />}
           </>
         )}
       </div>
-
       {expandedImage && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm transition-all p-4" onClick={() => setExpandedImage(null)}>
-          <button className="absolute top-6 right-6 text-white bg-white/20 p-2 rounded-full hover:bg-white/40"><X className="w-6 h-6"/></button>
-          <img src={expandedImage} className="max-w-full max-h-full object-contain rounded shadow-2xl" alt="Zoom" onClick={(e) => e.stopPropagation()} />
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" onClick={() => setExpandedImage(null)}>
+          <img src={expandedImage} className="max-w-full max-h-full object-contain rounded" alt="Full" />
+          <button className="absolute top-6 right-6 text-white bg-white/20 p-2 rounded-full hover:bg-white/40"><X size={24}/></button>
         </div>
       )}
     </div>
