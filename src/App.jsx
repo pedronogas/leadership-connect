@@ -4,7 +4,7 @@ import {
   ComposedChart, PieChart, Pie, Cell 
 } from 'recharts';
 import { 
-  LayoutDashboard, TrendingUp, Users, Database, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Monitor, Save, CheckCircle, Clock, ExternalLink, Image as ImageIcon, Plus, X, List, Trash2, Pencil, Search, Star, TrendingDown, Lightbulb, Settings, Send, FileText, Upload, Sparkles, BrainCircuit, Download, MousePointer2, Loader2, Bug, Terminal, AlertCircle, Menu
+  LayoutDashboard, TrendingUp, Users, Database, ChevronUp, ChevronDown, Minus, Calendar, MapPin, Monitor, Save, CheckCircle, Clock, ExternalLink, Image as ImageIcon, Plus, X, List, Trash2, Pencil, Search, Star, TrendingDown, Lightbulb, Settings, Send, FileText, Upload, Sparkles, BrainCircuit, Download, MousePointer2, Loader2, Bug, Terminal, AlertCircle, Menu, Activity
 } from 'lucide-react';
 
 // --- Celfocus Branding Guidelines V2.0 ---
@@ -57,6 +57,16 @@ const safeParseInt = (val) => {
   return isNaN(parsed) ? null : parsed;
 };
 
+// Generate an anonymous unique ID for tracking specific user sessions
+const getLocalUid = () => {
+  let uid = localStorage.getItem('lc_dashboard_uid');
+  if (!uid) {
+    uid = 'user_' + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('lc_dashboard_uid', uid);
+  }
+  return uid;
+};
+
 // --- Shared Components ---
 
 const Card = ({ children, className = "" }) => (
@@ -64,13 +74,6 @@ const Card = ({ children, className = "" }) => (
     {children}
   </div>
 );
-
-const getInitials = (name) => {
-  if (!name) return "U";
-  const parts = name.trim().split(" ");
-  if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  return name.substring(0, 2).toUpperCase();
-};
 
 const Avatar = ({ name, className = "" }) => {
   const initials = name ? name.trim().split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase() : "U";
@@ -107,7 +110,7 @@ const DeltaIndicator = ({ current, previous }) => {
 };
 
 const callGemini = async (prompt, systemInstruction = "You are a professional business analyst for Celfocus.") => {
-  const apiKey = "";
+  const apiKey = ""; // <--- PASTE YOUR KEY HERE IF YOU HAVEN'T ALREADY
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
   
   const delays = [1000, 2000, 4000, 8000, 16000];
@@ -156,6 +159,130 @@ const CleanAISummary = ({ text }) => {
 };
 
 // --- Sub-page Components ---
+
+function AppUsagePage({ usageData, brand }) {
+  const stats = useMemo(() => {
+    if (!usageData || usageData.length === 0) return null;
+    
+    const uniqueUsers = new Set();
+    const pageCounts = {};
+    const dateCounts = {};
+
+    usageData.forEach(u => {
+      if (u.userId) uniqueUsers.add(u.userId);
+      const pageName = u.page || 'unknown';
+      pageCounts[pageName] = (pageCounts[pageName] || 0) + 1;
+      
+      if (u.timestamp) {
+        const d = new Date(u.timestamp);
+        if (!isNaN(d.getTime())) {
+          const dateStr = d.toISOString().split('T')[0]; 
+          dateCounts[dateStr] = (dateCounts[dateStr] || 0) + 1;
+        }
+      }
+    });
+
+    let topPage = 'N/A';
+    let maxViews = 0;
+    Object.entries(pageCounts).forEach(([page, views]) => {
+      if (views > maxViews) { maxViews = views; topPage = page; }
+    });
+
+    const pageChart = Object.keys(pageCounts).map(k => ({ name: k, views: pageCounts[k] })).sort((a, b) => b.views - a.views);
+    const trendChart = Object.keys(dateCounts).sort().map(k => ({ date: k, activity: dateCounts[k] }));
+
+    return { 
+      totalVisits: usageData.length, 
+      uniqueUsers: uniqueUsers.size, 
+      topPage: topPage.toUpperCase(), 
+      pageChart, 
+      trendChart 
+    };
+  }, [usageData]);
+
+  if (!stats) return <div className="text-center p-12 text-[#9C9B9C] font-black uppercase tracking-widest animate-pulse">No Usage Data Collected Yet</div>;
+
+  return (
+    <div className="space-y-6 text-black animate-in fade-in duration-300">
+      <div className="flex justify-between items-end mb-6">
+        <div><h1 className="text-2xl font-black">Application Usage</h1><p className="text-[#636466] font-medium">Track dashboard engagement and active sessions.</p></div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="p-5 border-t-4 border-t-black flex flex-col justify-center">
+          <div className="text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Total Interactions</div>
+          <div className="text-4xl font-black">{stats.totalVisits}</div>
+        </Card>
+        <Card className="p-5 border-t-4 border-t-[#ED1C24] flex flex-col justify-center">
+          <div className="text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Unique Devices</div>
+          <div className="text-4xl font-black text-[#ED1C24]">{stats.uniqueUsers}</div>
+        </Card>
+        <Card className="p-5 border-t-4 border-t-[#719F81] flex flex-col justify-center">
+          <div className="text-[10px] font-black text-[#9C9B9C] uppercase mb-1">Most Active Page</div>
+          <div className="text-3xl font-black text-[#719F81] truncate">{stats.topPage}</div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-80">
+        <Card className="p-6">
+          <h3 className="text-sm font-black uppercase text-black mb-4">Activity Over Time</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.trendChart}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={brand.colors.border}/>
+                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} />
+                <RechartsTooltip contentStyle={{backgroundColor: 'black', color: 'white', borderRadius: '4px', border: 'none', fontWeight: 'bold'}} itemStyle={{color: '#ED1C24'}}/>
+                <Line type="monotone" dataKey="activity" stroke={brand.colors.primary} strokeWidth={4} dot={{r: 4, fill: brand.colors.primary, strokeWidth: 2, stroke: '#fff'}} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+        <Card className="p-6">
+          <h3 className="text-sm font-black uppercase text-black mb-4">Views per Screen</h3>
+          <div className="h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.pageChart} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={brand.colors.border}/>
+                <XAxis type="number" axisLine={false} tickLine={false} tick={{fill: brand.colors.textLight, fontSize: 10, fontWeight: 'bold'}} />
+                <YAxis dataKey="name" type="category" width={80} axisLine={false} tickLine={false} tick={{fill: brand.colors.secondary, fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase'}} />
+                <RechartsTooltip cursor={{fill: brand.colors.bg}} contentStyle={{backgroundColor: 'black', color: 'white', borderRadius: '4px', border: 'none', fontWeight: 'bold'}}/>
+                <Bar dataKey="views" fill={brand.colors.secondary} radius={[0, 4, 4, 0]} barSize={24} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </Card>
+      </div>
+
+      <Card className="mt-6 overflow-hidden">
+        <div className="p-5 border-b text-black font-black uppercase tracking-widest text-xs flex justify-between items-center">
+          <span>Recent Activity Log</span>
+          <span className="text-[10px] text-[#9C9B9C]">Last 50 events</span>
+        </div>
+        <div className="max-h-64 overflow-y-auto">
+          <table className="w-full text-left text-xs font-bold">
+            <thead className="bg-[#F8F8F8] sticky top-0 border-b">
+              <tr>
+                <th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Time</th>
+                <th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Page</th>
+                <th className="py-3 px-5 text-[#9C9B9C] uppercase tracking-widest">Device ID</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {[...usageData].reverse().slice(0, 50).map((row, i) => (
+                <tr key={`uselog-${i}`} className="hover:bg-[#F8F8F8] transition-colors">
+                  <td className="py-3 px-5 text-black">{new Date(row.timestamp).toLocaleString()}</td>
+                  <td className="py-3 px-5 uppercase text-[#ED1C24]">{row.page}</td>
+                  <td className="py-3 px-5 text-[#9C9B9C] font-mono">{row.userId}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 function InsightsPage({ completedEvents, brand }) {
   const [aiRecs, setAiRecs] = useState('');
@@ -624,6 +751,7 @@ export default function App() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [aggData, setAggData] = useState([]);
   const [partData, setPartData] = useState([]); 
+  const [usageData, setUsageData] = useState([]);
   const [expandedImage, setExpandedImage] = useState(null);
   const [uploadStatus, setUploadStatus] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -687,14 +815,40 @@ export default function App() {
         participantName: String(p.name || ''), attendanceType: p.presence === 'X' ? 'In-person' : (p.presence === 'R' ? 'Remote' : '') 
       }));
 
-      setAggData(events); setPartData(participants);
-      addLog('success', `Fetched ${events.length} events and ${participants.length} roster entries.`);
+      const usage = (result.usage || []).map(u => ({
+        timestamp: u.timestamp,
+        userId: String(u.userId || ''),
+        page: String(u.page || ''),
+        actionType: String(u.actionType || '')
+      }));
+
+      setAggData(events); 
+      setPartData(participants);
+      setUsageData(usage);
+      addLog('success', `Fetched ${events.length} events, ${participants.length} roster entries, ${usage.length} usage logs.`);
     } catch (err) { 
       setConnectionError(err.message); addLog('error', 'Main fetch failed', err.toString());
     } finally { setIsConnecting(false); setIsLoadingInitial(false); }
   };
 
   useEffect(() => { fetchAllData(); }, []);
+
+  // --- Silent Usage Tracker ---
+  useEffect(() => {
+    if (!webhookUrl || isLoadingInitial) return;
+    const uid = getLocalUid();
+    const logVisit = async () => {
+      try {
+        await fetch(webhookUrl, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'logUsage', userId: uid, page: activeTab, actionType: 'view' })
+        });
+      } catch (e) {
+        // fail silently to not disrupt UX
+      }
+    };
+    logVisit();
+  }, [activeTab, webhookUrl, isLoadingInitial]);
 
   const completedEvents = useMemo(() => {
     return [...aggData].filter(e => e.attendance !== null).sort((a, b) => {
@@ -897,6 +1051,7 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
     { id: 'settings', label: 'Settings', icon: Settings, subItems: [ 
         { id: 'events', label: 'Event Details', icon: List }, 
         { id: 'data', label: 'Data Management', icon: Database },
+        { id: 'usage', label: 'App Usage', icon: Activity },
         { id: 'debug', label: 'Debug Console', icon: Bug }
       ] 
     }
@@ -1079,6 +1234,7 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
             {activeTab === 'participant' && <ParticipantTrackerPage partData={partData} aggData={aggData} brand={BRAND} callGemini={callGemini} />}
             {activeTab === 'events' && <EventManagementPage aggData={aggData} setAggData={setAggData} />}
             {activeTab === 'data' && <DataManagementPage aggData={aggData} partData={partData} fetchAllData={fetchAllData} isConnecting={isConnecting} connectionError={connectionError} webhookUrl={webhookUrl} setWebhookUrl={setWebhookUrl} />}
+            {activeTab === 'usage' && <AppUsagePage usageData={usageData} brand={BRAND} />}
             {activeTab === 'debug' && <DebugConsolePage logs={logs} clearLogs={() => setLogs([])} />}
           </>
         )}
