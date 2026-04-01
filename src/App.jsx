@@ -83,13 +83,24 @@ const Avatar = ({ name, className = "" }) => {
 
 const DeltaIndicator = ({ current, previous }) => {
   if (current === null || previous === null || current === undefined || previous === undefined) return null;
-  const delta = (current - previous).toFixed(2);
-  const isPositive = delta > 0;
-  const isNegative = delta < 0;
+  
+  let deltaPercent = 0;
+  if (previous !== 0) {
+    deltaPercent = ((current - previous) / Math.abs(previous)) * 100;
+  } else if (current !== 0) {
+    deltaPercent = 100;
+  } else {
+    return null;
+  }
+
+  const isPositive = deltaPercent > 0;
+  const isNegative = deltaPercent < 0;
+  const displayValue = Math.abs(deltaPercent).toFixed(1);
+
   return (
     <div className={`flex items-center text-sm font-bold ${isPositive ? 'text-[#719F81]' : isNegative ? 'text-[#ED1C24]' : 'text-[#9C9B9C]'}`}>
       {isPositive ? <ChevronUp size={16} /> : (isNegative ? <ChevronDown size={16} /> : <Minus size={16} />)}
-      <span>{Math.abs(delta)}</span>
+      <span>{displayValue}%</span>
       <span className="text-[#9C9B9C] ml-1 font-normal text-xs">vs prev</span>
     </div>
   );
@@ -98,19 +109,29 @@ const DeltaIndicator = ({ current, previous }) => {
 const callGemini = async (prompt, systemInstruction = "You are a professional business analyst for Celfocus.") => {
   const apiKey = "";
   const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        systemInstruction: { parts: [{ text: systemInstruction }] }
-      })
-    });
-    const result = await response.json();
-    return result.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
-  } catch (e) {
-    return "AI generation currently unavailable.";
+  
+  const delays = [1000, 2000, 4000, 8000, 16000];
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          systemInstruction: { parts: [{ text: systemInstruction }] }
+        })
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const result = await response.json();
+      return result.candidates?.[0]?.content?.parts?.[0]?.text || "No response generated.";
+    } catch (e) {
+      if (attempt === 5) {
+        return `AI generation currently unavailable. Please try again. (${e.message})`;
+      }
+      await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+    }
   }
 };
 
@@ -347,7 +368,10 @@ function ParticipantTrackerPage({ partData, aggData }) {
     return partData.filter(p => String(p.participantName || "") === selectedPerson && p.attendanceType).map(p => {
       const e = aggData.find(ev => normalize(ev.year) === normalize(p.year) && robustNormalizeMonth(ev.month).toLowerCase() === robustNormalizeMonth(p.month).toLowerCase());
       return { ...p, eventDate: `${p.month} ${p.year}`, theme: e?.theme || '-', host: e?.host || '-', id: e?.id || 0 };
-    }).sort((a,b) => b.id - a.id);
+    }).sort((a,b) => {
+      if (normalize(a.year) !== normalize(b.year)) return safeParseInt(b.year) - safeParseInt(a.year);
+      return (monthOrder[robustNormalizeMonth(b.month)] || 0) - (monthOrder[robustNormalizeMonth(a.month)] || 0);
+    });
   }, [selectedPerson, partData, aggData]);
 
   const stats = useMemo(() => {
@@ -675,7 +699,7 @@ export default function App() {
   const completedEvents = useMemo(() => {
     return [...aggData].filter(e => e.attendance !== null).sort((a, b) => {
       if (normalize(a.year) !== normalize(b.year)) return safeParseInt(a.year) - safeParseInt(b.year);
-      return (monthOrder[a.month] || 0) - (monthOrder[b.month] || 0);
+      return (monthOrder[robustNormalizeMonth(a.month)] || 0) - (monthOrder[robustNormalizeMonth(b.month)] || 0);
     });
   }, [aggData]);
 
@@ -721,10 +745,15 @@ export default function App() {
 
   const filteredParticipants = useMemo(() => {
     let list = [...eventParticipants];
+
     if (rosterFilter === 'In-person') list = list.filter(p => p.attendanceType === 'In-person');
     else if (rosterFilter === 'Remote') list = list.filter(p => p.attendanceType === 'Remote');
     else if (rosterFilter === 'Absent') list = list.filter(p => !p.attendanceType);
-    if (rosterSearch.trim()) list = list.filter(p => (p.participantName || "").toLowerCase().includes(rosterSearch.toLowerCase()));
+
+    if (rosterSearch.trim()) {
+      list = list.filter(p => (p.participantName || "").toLowerCase().includes(rosterSearch.toLowerCase()));
+    }
+
     return list.sort((a, b) => (a.participantName || "").localeCompare(b.participantName || ""));
   }, [eventParticipants, rosterSearch, rosterFilter]);
 
@@ -990,12 +1019,20 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
                             <tr><th className="py-3 px-5 text-[#9C9B9C] uppercase">Participant</th><th className="py-3 px-5 text-[#9C9B9C] uppercase">Status</th></tr>
                           </thead>
                           <tbody className="divide-y">
-                            {filteredParticipants.map((p, i) => (
-                              <tr key={`app-part-${p.id || i}`} className="hover:bg-[#F8F8F8]">
-                                <td className="py-3 px-5">{p.participantName}</td>
-                                <td className="py-3 px-5"><span className={`inline-flex px-2 py-1 rounded-sm text-[10px] font-black uppercase ${p.attendanceType === 'In-person' ? 'bg-[#EEEEEE] text-black' : p.attendanceType === 'Remote' ? 'bg-[#FF4F50]/10 text-[#ED1C24]' : 'bg-gray-100 text-[#9C9B9C] opacity-60'}`}>{p.attendanceType || 'Absent'}</span></td>
+                            {filteredParticipants.length === 0 ? (
+                              <tr>
+                                <td colSpan="2" className="py-8 text-center text-[#9C9B9C] text-xs font-bold italic">
+                                  No participant data uploaded for this event.
+                                </td>
                               </tr>
-                            ))}
+                            ) : (
+                              filteredParticipants.map((p, i) => (
+                                <tr key={`app-part-${p.id || i}`} className="hover:bg-[#F8F8F8]">
+                                  <td className="py-3 px-5">{p.participantName}</td>
+                                  <td className="py-3 px-5"><span className={`inline-flex px-2 py-1 rounded-sm text-[10px] font-black uppercase ${p.attendanceType === 'In-person' ? 'bg-[#EEEEEE] text-black' : p.attendanceType === 'Remote' ? 'bg-[#FF4F50]/10 text-[#ED1C24]' : 'bg-gray-100 text-[#9C9B9C] opacity-60'}`}>{p.attendanceType || 'Absent'}</span></td>
+                                </tr>
+                              ))
+                            )}
                           </tbody>
                         </table>
                       </div>
