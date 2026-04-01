@@ -459,7 +459,7 @@ function DataManagementPage({ aggData, partData, fetchAllData, isConnecting, con
   const handleSync = async () => {
     setIsSaving(true);
     try {
-      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery) : "[]" }));
+      const eventsToSync = localData.map(e => ({ year: e.year, month: e.month, attendance: e.attendance, inPerson: e.inPerson, remote: e.remote, nps: e.nps, insightful: e.insightful, logistics: e.logistics, host: e.host, theme: e.theme, gallery: e.gallery ? JSON.stringify(e.gallery.map(g => g.url || g)) : "[]" }));
       const agendasToSync = localData.map(e => ({ year: e.year, month: e.month, slots: [e.agenda?.[0] || {topic:"",speaker:"",artifact:""}, e.agenda?.[1] || {topic:"",speaker:"",artifact:""}, e.agenda?.[2] || {topic:"",speaker:"",artifact:""}] }));
       await fetch(webhookUrl, { method: 'POST', body: JSON.stringify({ action: 'syncData', events: eventsToSync, participants: localPartData, agendas: agendasToSync }) });
       setSaveSuccess(true);
@@ -933,8 +933,8 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-black font-black">
                   <Card className="p-5 border-l-4 border-l-[#ED1C24]"><div className="text-[10px] text-[#9C9B9C] uppercase">Attendance</div><div className="text-3xl mt-1">{currentHomeEvent.attendance}%</div><DeltaIndicator current={currentHomeEvent.attendance} previous={prevHomeEvent?.attendance}/></Card>
                   <Card className="p-5 border-l-4 border-l-black"><div className="text-[10px] text-[#9C9B9C] uppercase">NPS Score</div><div className="text-3xl mt-1">{currentHomeEvent.nps}</div><DeltaIndicator current={currentHomeEvent.nps} previous={prevHomeEvent?.nps}/></Card>
-                  <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-[10px] text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl mt-1">{currentHomeEvent.insightful}</div></Card>
-                  <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-[10px] text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl mt-1">{currentHomeEvent.logistics}</div></Card>
+                  <Card className="p-5 border-l-4 border-l-[#494E5E]"><div className="text-[10px] text-[#9C9B9C] uppercase">Insightful</div><div className="text-3xl mt-1">{currentHomeEvent.insightful}</div><DeltaIndicator current={currentHomeEvent.insightful} previous={prevHomeEvent?.insightful}/></Card>
+                  <Card className="p-5 border-l-4 border-l-[#9C9B9C]"><div className="text-[10px] text-[#9C9B9C] uppercase">Logistics</div><div className="text-3xl mt-1">{currentHomeEvent.logistics}</div><DeltaIndicator current={currentHomeEvent.logistics} previous={prevHomeEvent?.logistics}/></Card>
                 </div>
                 <Card className="p-6">
                   <div className="flex justify-between items-center mb-6 text-black">
@@ -951,7 +951,7 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
                       <div key={`photo-${idx}`} className="flex-shrink-0 w-48 h-32 relative group rounded-lg overflow-hidden border bg-gray-50 shadow-sm transition-transform hover:scale-[1.02]">
                         <img src={img.thumbnailUrl} alt={img.name} className="w-full h-full object-cover" />
                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                          <button onClick={() => setExpandedImage(img.thumbnailUrl.replace('w800', 'w2000'))} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all text-black"><MousePointer2 size={16} /></button>
+                          <button onClick={() => setExpandedImage(img)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all text-black"><MousePointer2 size={16} /></button>
                           <button onClick={() => handleDeleteImage(img)} className="p-2 bg-white rounded-full hover:bg-[#ED1C24] hover:text-white transition-all text-black"><Trash2 size={16} /></button>
                         </div>
                       </div>
@@ -1048,8 +1048,13 @@ Keep it factual and direct. Do not use markdown symbols like ### or **. Use plai
       </div>
       {expandedImage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4" onClick={() => setExpandedImage(null)}>
-          <img src={expandedImage} className="max-w-full max-h-full object-contain rounded shadow-2xl border border-white/10" alt="Full Preview" />
-          <button className="absolute top-6 right-6 text-white bg-white/20 p-2 rounded-full hover:bg-[#ED1C24] transition-colors"><X size={24}/></button>
+          <img src={expandedImage.thumbnailUrl.replace('w800', 'w2000')} className="max-w-full max-h-full object-contain rounded shadow-2xl border border-white/10" alt="Full Preview" />
+          <div className="absolute top-6 right-6 flex items-center gap-4">
+            <a href={expandedImage.url} download target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} className="text-white bg-white/20 p-2 rounded-full hover:bg-[#ED1C24] transition-colors">
+              <Download size={24} />
+            </a>
+            <button className="text-white bg-white/20 p-2 rounded-full hover:bg-[#ED1C24] transition-colors"><X size={24}/></button>
+          </div>
         </div>
       )}
     </div>
